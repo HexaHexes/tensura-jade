@@ -29,6 +29,16 @@ base {
 // Mojang ships Java 21 to end users in 1.21.1, so mods should target Java 21.
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
+// Game tests live in their own source set: they compile against main and the same
+// optional mod jars, run under the gameTestServer run below, and are deliberately
+// NOT part of sourceSets.main - so none of it is packaged into the released jar.
+sourceSets {
+    gametest {
+        compileClasspath += sourceSets.main.output + configurations.compileClasspath
+        runtimeClasspath += output + sourceSets.main.output + configurations.runtimeClasspath
+    }
+}
+
 neoForge {
     // Specify the version of NeoForge to use.
     version = project.neo_version
@@ -48,6 +58,13 @@ neoForge {
             programArgument '--nogui'
         }
 
+        // Headless test runner: loads the game test server, runs every registered
+        // @GameTest, then exits with the number of failed required tests as the exit
+        // code. Never opens a window, so `gradlew runGameTestServer` is CI-safe.
+        gameTestServer {
+            type = "gameTestServer"
+        }
+
         // applies to all the run configs above
         configureEach {
             systemProperty 'forge.logging.markers', 'REGISTRIES'
@@ -58,6 +75,9 @@ neoForge {
     mods {
         "${mod_id}" {
             sourceSet(sourceSets.main)
+            // The gametest source set joins the mod only for the gameTestServer run,
+            // so @GameTestHolder is discovered from FML's scan data.
+            sourceSet(sourceSets.gametest)
         }
     }
 }

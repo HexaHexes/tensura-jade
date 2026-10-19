@@ -29,9 +29,9 @@ This addon is the bridge, and it belongs in both mod lists: without Tensura ther
 | `HP:` | Health, whole points |
 | `SHP:` | Spiritual health, rounded up |
 | `Armor:` | Armor value |
-| `AP:` | Aura, shortened (`12.3k`) exactly as Tensura shortens it |
-| `MP:` | Magicule, shortened |
-| `EP:` | Existence points, shortened — with Tensura's blurring, see below |
+| `AP:` | Aura — a bare figure below a million, `1.4M` above, shortened exactly as Tensura shortens it |
+| `MP:` | Magicule, shortened the same way |
+| `EP:` | Existence points, shortened the same way — with Tensura's blurring, see below |
 | *abilities* | Every qualifying ability, one per line |
 
 Label wording is **Tensura's own translation keys**, not a transcription of its English text — so the panel reads, and localises, identically to the overlay it replaces. `Alignment:` is the only label this mod contributes itself.
@@ -68,7 +68,7 @@ If a target has abilities but none qualify, the line reads `None` — Tensura's 
 
 ### EP blurring is preserved
 
-While gating is on (the default), an EP beyond the viewer's grasp is shown as **`12k+`** rather than the real number, reproducing the capped readout Tensura draws. That cap exists so analysis cannot be used to measure the unmeasurable — this addon does not remove it.
+While gating is on (the default), an EP beyond the viewer's grasp is shown as **`2100+`** rather than the real number — the viewer's own reach, with a `+` behind it — reproducing the capped readout Tensura draws. Below a million nothing is abbreviated, so it reads as a plain figure with that suffix. That cap exists so analysis cannot be used to measure the unmeasurable — this addon does not remove it.
 
 ### Nothing is read through reflection
 
@@ -77,6 +77,20 @@ Tensura draws its panel from `private static` methods inside `OverlayHandler`, s
 Instead the addon **re-reads the same public APIs** Tensura reads (ManasCore's existence, race, skill and ability storage, Tensura's own attributes and helpers) and rebuilds each line. Content parity, not renderer reuse: same data, same keys, same formatting rules.
 
 The one thing reused directly is the **target**, from Jade's own raytrace.
+
+### One helper is transcribed, not called
+
+Tensura keeps its number shortening — the `1.4M` / `2.3B` figure — inside `RenderHelper`,
+a client-rendering utility whose other methods take `GuiGraphics` and `MultiBufferSource`.
+Loading *that* class on a dedicated server aborts, because the JVM resolves those
+parameter types even for a method as pure as this one.
+
+The algorithm itself needs nothing but `DecimalFormat` and two of Tensura's own
+translation keys, so it is reproduced in `TensuraAnalysis`: the same two thresholds, the
+same patterns, and still Tensura's `million_index` / `billion_index` keys — so the wording
+comes from Tensura's language file rather than from here. It is the single point where
+this addon copies rather than calls, and if Tensura ever moves those thresholds, the two
+copies move with them.
 
 ---
 
@@ -164,6 +178,52 @@ Take them from the matching projects' own downloads. Missing any produces a Grad
 **These pins are deliberate.** The suppression mixin names Tensura's methods — `pre_renderAnalysis`, `renderAnalysis` — and resolves them without a refmap, so compiling against a different Tensura than the one being run is the failure mode that matters. Compile against the version you ship with.
 
 Jade is not referenced by Tensura, and Tensura is not referenced by Jade; nothing in either jar had to be modified to make this work.
+
+---
+
+## Testing
+
+The addon is verified by **headless GameTests**. They run on a dedicated server, with no
+window ever opened — no client boot is involved at any point:
+
+```
+gradlew runGameTestServer
+```
+
+All **11 required tests** must pass; anything else fails the build.
+
+| Test | Covers |
+| --- | --- |
+| `gating_matrix` | every branch of the gating rules: both analysis attributes, all four analysis modes, reach, and the override turning the lot off |
+| `entity_panel_lines` | the seven lines of a raceless mob — labels, order and values |
+| `race_line` | the race line leading the panel, named without a label and tinted with the alignment colour |
+| `ability_listing` | one line per qualifying ability, and mastered ones skipped |
+| `ep_blur` | EP blurred to `<reach>+` while gated, exact while not |
+| `block_panel_lines` | hardness, resistance, light, tool check and crop age |
+| `multipart_resolution` | aiming at a multipart part resolves to the creature it belongs to |
+| `live_multipart_resolution` | the same against a real Tensura multipart mob, which builds its parts asynchronously |
+| `config_registration_completes` | the five toggles register, all on by default, and no category is declared |
+| `category_keys_derive` | every dotted key resolves to the addon's own settings group |
+| `overlay_config_default` | hiding Tensura's overlay ships enabled |
+
+Three decisions shape them, and they are worth knowing before changing them:
+
+- **Assertions are resolution-neutral.** Whether a translation file happens to have loaded
+  on this headless server is not under test, so expected text is built with the same
+  `Component.translatable(...)` call production uses, and what is asserted structurally is
+  the stable contract — the key itself. A key that drifts away from Tensura's fails here
+  rather than showing a player a raw translation key.
+- **Values are pinned, not assumed.** Whatever Tensura leaves a mob's health, or a raced
+  mob's attributes, is Tensura's business — its balance changes freely. The tests set those
+  inputs first, so the assertions describe this panel rather than a third mod's tuning.
+- **Nothing client-only is touched.** Loading a client class on a dedicated server aborts,
+  which is why the number shortening is transcribed rather than called (above), and why the
+  config tests use a hand-written stand-in instead of a `java.lang.reflect.Proxy` — a proxy
+  enumerates an interface's methods, which loads every parameter type, client-only ones
+  included, before a line of test code can run.
+
+The tests live in a separate `src/gametest` source set wired into the `gameTestServer` run
+only. None of it is packaged into the released jar.
 
 ---
 

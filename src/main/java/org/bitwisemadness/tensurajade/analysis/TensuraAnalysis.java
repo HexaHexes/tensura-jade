@@ -18,8 +18,6 @@ import io.github.manasmods.tensura.storage.ability.IAbility;
 import io.github.manasmods.tensura.storage.ep.IExistence;
 import io.github.manasmods.tensura.storage.player.ITensuraPlayer;
 import io.github.manasmods.tensura.util.EnergyHelper;
-import io.github.manasmods.tensura.util.client.RenderHelper;
-import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -40,6 +38,7 @@ import snownee.jade.api.EntityAccessor;
 import snownee.jade.api.ITooltip;
 import snownee.jade.api.config.IPluginConfig;
 
+import java.text.DecimalFormat;
 import java.util.List;
 import java.util.Optional;
 
@@ -53,9 +52,11 @@ import java.util.Optional;
  * keys, so wording and localisation match by construction rather than by copying
  * English strings.</p>
  *
- * <p>Every method signature here uses only vanilla or Jade types, and the class holds no
- * Tensura-typed fields. That is deliberate: providers may be loaded while Tensura is
- * absent, and the class must stay loadable. Callers gate on
+ * <p>Every method signature here uses only vanilla or Jade types, the class holds no
+ * Tensura-typed fields, and it references no client-only classes. All three are
+ * deliberate: providers may be loaded while Tensura is absent, so the class must stay
+ * loadable; and the panel is verified by headless game tests, which run on a dedicated
+ * server where loading a client class aborts. Callers gate on
  * {@code ModList.isLoaded("tensura")} before touching this class at all.</p>
  */
 public final class TensuraAnalysis {
@@ -133,8 +134,8 @@ public final class TensuraAnalysis {
         addStat(tooltip, LABEL_HP, Component.literal(Integer.toString(Mth.ceil(entity.getHealth()))));
         addStat(tooltip, LABEL_SHP, Component.literal(Integer.toString((int) Math.ceil(existence.getSpiritualHealth()))));
         addStat(tooltip, LABEL_ARMOR, Component.literal(Integer.toString(entity.getArmorValue())));
-        addStat(tooltip, LABEL_AURA, RenderHelper.getShortenedNumber(existence.getAura()));
-        addStat(tooltip, LABEL_MAGICULE, RenderHelper.getShortenedNumber(existence.getMagicule()));
+        addStat(tooltip, LABEL_AURA, shortenedNumber(existence.getAura()));
+        addStat(tooltip, LABEL_MAGICULE, shortenedNumber(existence.getMagicule()));
         addStat(tooltip, LABEL_EP, epValue(viewer, entity, config));
 
         if (config.get(TensuraJadeConfig.SHOW_ABILITIES)) {
@@ -175,14 +176,14 @@ public final class TensuraAnalysis {
     private static Component epValue(Player viewer, LivingEntity entity, IPluginConfig config) {
         double maxEp = EnergyHelper.getMaxEP(entity);
         if (!config.get(TensuraJadeConfig.RESPECT_ANALYSIS_GATING)) {
-            return RenderHelper.getShortenedNumber(maxEp);
+            return shortenedNumber(maxEp);
         }
 
         double reach = EnergyHelper.getMaxEP(viewer) * (1.0 + (double) analysisLevel(viewer) * 0.5);
         if (maxEp > reach) {
-            return concat(RenderHelper.getShortenedNumber(reach), Component.literal("+"));
+            return concat(shortenedNumber(reach), Component.literal("+"));
         }
-        return RenderHelper.getShortenedNumber(maxEp);
+        return shortenedNumber(maxEp);
     }
 
     /**
@@ -244,6 +245,12 @@ public final class TensuraAnalysis {
      * {@code Player#hasCorrectToolForDrops(BlockState)} are exactly the methods
      * Tensura's own {@code renderBlockAnalysis()} uses. Substituting their successors
      * would risk computing numbers that differ from the overlay this panel replaces.</p>
+     *
+     * <p>The viewer is accepted as {@link Player} rather than narrowed to the client's
+     * {@code LocalPlayer}: only the tool-drop check is needed, which lives on
+     * {@code Player}, and accepting the wider type lets this method run under a headless
+     * game test server. Jade tooltips only ever render client-side, so the widened check
+     * behaves identically in production.</p>
      */
     @SuppressWarnings("deprecation")
     public static void appendBlock(ITooltip tooltip, BlockAccessor accessor, IPluginConfig config) {
@@ -251,7 +258,7 @@ public final class TensuraAnalysis {
         if (state == null || state.isAir()) {
             return;
         }
-        if (!(accessor.getPlayer() instanceof LocalPlayer viewer)) {
+        if (!(accessor.getPlayer() instanceof Player viewer)) {
             return;
         }
         BlockPos pos = accessor.getPosition();
@@ -284,7 +291,7 @@ public final class TensuraAnalysis {
         addIntegerProperty(tooltip, state, "power", LABEL_REDSTONE);
 
         if (accessor.getBlockEntity() instanceof CharybdisCoreBlockEntity core) {
-            addStat(tooltip, LABEL_BLOCK_EP, RenderHelper.getShortenedNumber(core.getEP()));
+            addStat(tooltip, LABEL_BLOCK_EP, shortenedNumber(core.getEP()));
         }
     }
 
@@ -360,6 +367,36 @@ public final class TensuraAnalysis {
 
     private static void addStat(ITooltip tooltip, String labelKey, Component value) {
         tooltip.add(Component.translatable(labelKey).append(Component.literal(": ")).append(value));
+    }
+
+    /**
+     * The number shortening Tensura's overlay prints, reproduced rather than reused.
+     *
+     * <p>Tensura keeps this as {@code RenderHelper.getShortenedNumber}, a static method
+     * inside a client-rendering utility whose neighbours take {@code GuiGraphics} and
+     * {@code MultiBufferSource}. Loading <em>that</em> class on a dedicated server aborts
+     * with {@code invalid dist DEDICATED_SERVER}, because verification resolves those
+     * parameter types even for a pure method. This panel is therefore transcribed here
+     * byte-for-byte from Tensura's implementation - the same two thresholds, the same
+     * {@code DecimalFormat} patterns, and Tensura's own {@code million_index} /
+     * {@code billion_index} keys - so values read identically while staying loadable on
+     * both sides.</p>
+     *
+     * <p>Anything below a million prints as a bare integer, as {@code "14000"}; a million
+     * or more becomes {@code "1.4M"}-style through Tensura's translation keys, so the
+     * wording still comes from Tensura's language file rather than from here.</p>
+     */
+    private static Component shortenedNumber(double value) {
+        if (value < 1_000_000.0D) {
+            return Component.literal(new DecimalFormat("#").format(value));
+        }
+        DecimalFormat scaled = new DecimalFormat("#.##");
+        if (value < 1_000_000_000.0D) {
+            return Component.translatable("tensura.main_menu.million_index",
+                    scaled.format(value / 1_000_000.0D));
+        }
+        return Component.translatable("tensura.main_menu.billion_index",
+                scaled.format(value / 1_000_000_000.0D));
     }
 
     private static MutableComponent concat(Component... parts) {

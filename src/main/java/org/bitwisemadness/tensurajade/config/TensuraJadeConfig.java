@@ -1,6 +1,5 @@
 package org.bitwisemadness.tensurajade.config;
 
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import org.bitwisemadness.tensurajade.TensuraJade;
 import snownee.jade.api.IWailaClientRegistration;
@@ -10,12 +9,12 @@ import snownee.jade.api.IWailaClientRegistration;
  * the settings sit next to the tooltip they control.
  *
  * <p>Key shape matters: Jade derives a setting's <em>category</em> by truncating the
- * path at its first {@code '.'}. Paths therefore carry a dot, and resolve to the
- * primary key {@code tensura_jade:tensura_jade} - which is exactly the
- * {@link #CATEGORY} entry used to name the group.</p>
+ * path at its first {@code '.'}, and refuses to name a category it was not already
+ * told about - so the group is named by the derived primary key itself. Paths
+ * therefore carry a dot, and every one of them resolves to {@link #CATEGORY}.</p>
  */
 public final class TensuraJadeConfig {
-    /** Jade's settings category for this addon. */
+    /** The settings group the toggles appear under: every key's derived primary key. */
     public static final ResourceLocation CATEGORY = key("tensura_jade");
 
     /** Append the target's analysis lines to Jade's entity tooltip. */
@@ -44,14 +43,13 @@ public final class TensuraJadeConfig {
     private TensuraJadeConfig() {
     }
 
-    /** Registers the toggles and names the group they appear under in Jade's settings. */
+    /** Registers the toggles, grouped by their dotted paths under {@link #CATEGORY}. */
     public static void register(IWailaClientRegistration registration) {
         registration.addConfig(ENTITY_ANALYSIS, true);
         registration.addConfig(BLOCK_ANALYSIS, true);
         registration.addConfig(SHOW_ABILITIES, true);
         registration.addConfig(HIDE_TENSURA_OVERLAY, true);
         registration.addConfig(RESPECT_ANALYSIS_GATING, true);
-        registration.setConfigCategoryOverride(CATEGORY, Component.literal("Tensura Jade"));
     }
 
     private static ResourceLocation key(String path) {

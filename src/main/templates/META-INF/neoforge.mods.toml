@@ -1,0 +1,76 @@
+# Mod metadata file. Values written in dollar-brace form are replaced at build time
+# from gradle.properties.
+# See https://docs.neoforged.net/docs/concepts/modfiles/ for the full schema.
+
+modLoader="javafml"
+loaderVersion="${loader_version_range}"
+license="${mod_license}"
+
+[[mods]]
+    modId="${mod_id}"
+    version="${mod_version}"
+    displayName="${mod_name}"
+    description='''Puts Tensura's analysis window inside Jade's tooltip.
+
+While both mods are loaded, the race, alignment, HP, SHP, armor, aura, magicule, EP and
+abilities Tensura would show on a mob - and the hardness, resistance, light, harvest
+check, crop age and EP it would show on a block - are appended to Jade's tooltip instead
+of floating in Tensura's own overlay, so the information appears once, where the rest of
+your look-up details already are.
+
+The addon does nothing if either mod is missing: it adds no tooltip without Jade, and has
+no analysis to show without Tensura.
+'''
+
+# Suppresses Tensura's floating analysis overlay so it is not shown alongside Jade's
+# copy of the same information. Only loaded when BOTH mods are present, so the
+# addon can never hide the overlay without putting it back into a tooltip.
+[[mixins]]
+    config="tensura_jade.mixins.json"
+    requiredMods=["tensura", "jade"]
+
+# A dependency - use the . to indicate dependency for a specific modid. Dependencies are optional.
+[[dependencies.tensura_jade]] #optional
+    # the modid of the dependency
+    modId="neoforge" #mandatory
+    # The type of the dependency. Can be one of "required", "optional", "incompatible" or "discouraged" (case insensitive).
+    type="required" #mandatory
+    # The version range of the dependency
+    versionRange="[${neo_version},)" #mandatory
+    # An ordering relationship for the dependency.
+    ordering="NONE"
+    # Side this dependency is applied on - BOTH, CLIENT, or SERVER
+    side="BOTH"
+
+[[dependencies.tensura_jade]]
+    modId="minecraft"
+    type="required"
+    versionRange="${minecraft_version_range}"
+    ordering="NONE"
+    side="BOTH"
+
+# Jade - optional. The tooltip window this addon adds analysis lines to, and the settings
+# screen that hosts every toggle it exposes. Without Jade there is nowhere to put the
+# analysis, so the addon registers nothing.
+[[dependencies.tensura_jade]]
+    modId="jade"
+    type="optional"
+    ordering="AFTER"
+    side="BOTH"
+
+# Tensura - optional. The analysis content being merged, and the suppression target.
+# Without Tensura there is no analysis, so the providers stay inert and the mixin is
+# not applied at all (see requiredMods above).
+[[dependencies.tensura_jade]]
+    modId="tensura"
+    type="optional"
+    ordering="AFTER"
+    side="BOTH"
+
+# ManasCore - optional. Tensura's library; provides the existence, race and ability
+# APIs the analysis lines are read from. Present whenever Tensura is.
+[[dependencies.tensura_jade]]
+    modId="manascore"
+    type="optional"
+    ordering="AFTER"
+    side="BOTH"

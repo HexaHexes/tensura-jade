@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "org.bitwisemadness.tensurajade.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "plugin": "org.bitwisemadness.tensurajade.mixin.TensuraJadeMixinPlugin",
+
+  "client": [
+    "OverlayHandlerMixin"
+  ],
+
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

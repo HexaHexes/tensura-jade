@@ -116,22 +116,21 @@ public final class AnalysisGameTests {
 
     /**
      * Tensura only lets you analyse when both analysis attributes are positive, then only
-     * what the analysis mode allows, then only within reach - and the addon's override
-     * turns all of that off. Every branch of {@link TensuraAnalysis#allowedForEntity}
-     * and {@link TensuraAnalysis#allowedForBlock} is covered here.
+     * what the analysis mode allows - and the addon's override turns all of that off.
+     * Reach is deliberately absent from that list; see
+     * {@link TensuraAnalysis#allowedForEntity}. Every branch that remains is covered here.
      */
     @GameTest(template = "test_area")
     public static void gating_matrix(GameTestHelper helper) {
         Player viewer = helper.makeMockPlayer(GameType.CREATIVE);
         Cow target = helper.spawn(EntityType.COW, new BlockPos(4, 1, 4));
-        BlockPos targetBlock = helper.absolutePos(new BlockPos(4, 1, 4));
 
         // Override off: nothing else may be consulted, so this must hold for a viewer
         // that has never been given an analysis attribute at all.
         IPluginConfig relaxed = config(values(TensuraJadeConfig.RESPECT_ANALYSIS_GATING, false));
-        check(TensuraAnalysis.allowedForEntity(viewer, target, relaxed),
+        check(TensuraAnalysis.allowedForEntity(viewer, relaxed),
                 "with the override off, mob analysis must not be gated - that is the whole point of the toggle");
-        check(TensuraAnalysis.allowedForBlock(viewer, targetBlock, relaxed),
+        check(TensuraAnalysis.allowedForBlock(viewer, relaxed),
                 "with the override off, block analysis must not be gated");
 
         IPluginConfig gated = config(values(TensuraJadeConfig.RESPECT_ANALYSIS_GATING, true));
@@ -139,16 +138,16 @@ public final class AnalysisGameTests {
         // Tensura refuses to analyse at all unless BOTH attributes are positive.
         setAttribute(viewer, TensuraAttributes.ANALYSIS_LEVEL, 0);
         setAttribute(viewer, TensuraAttributes.ANALYSIS_DISTANCE, 10);
-        check(!TensuraAnalysis.allowedForEntity(viewer, target, gated),
+        check(!TensuraAnalysis.allowedForEntity(viewer, gated),
                 "analysis level 0 must deny mob analysis");
-        check(!TensuraAnalysis.allowedForBlock(viewer, targetBlock, gated),
+        check(!TensuraAnalysis.allowedForBlock(viewer, gated),
                 "analysis level 0 must deny block analysis");
 
         setAttribute(viewer, TensuraAttributes.ANALYSIS_LEVEL, 2);
         setAttribute(viewer, TensuraAttributes.ANALYSIS_DISTANCE, 0);
-        check(!TensuraAnalysis.allowedForEntity(viewer, target, gated),
+        check(!TensuraAnalysis.allowedForEntity(viewer, gated),
                 "an analysis distance of 0 must deny mob analysis");
-        check(!TensuraAnalysis.allowedForBlock(viewer, targetBlock, gated),
+        check(!TensuraAnalysis.allowedForBlock(viewer, gated),
                 "an analysis distance of 0 must deny block analysis");
 
         // A viewer that satisfies both attributes, standing on top of the target.
@@ -159,35 +158,37 @@ public final class AnalysisGameTests {
         viewer.setPos(target.getX(), target.getY(), target.getZ());
 
         data.setAnalysisMode(0);
-        check(TensuraAnalysis.allowedForEntity(viewer, target, gated),
+        check(TensuraAnalysis.allowedForEntity(viewer, gated),
                 "mode 0 analyses whatever is aimed at, so a mob in reach must be allowed");
-        check(TensuraAnalysis.allowedForBlock(viewer, targetBlock, gated),
+        check(TensuraAnalysis.allowedForBlock(viewer, gated),
                 "mode 0 analyses whatever is aimed at, so a block in reach must be allowed");
 
         data.setAnalysisMode(1);
-        check(TensuraAnalysis.allowedForEntity(viewer, target, gated), "mode 1 analyses mobs");
-        check(!TensuraAnalysis.allowedForBlock(viewer, targetBlock, gated), "mode 1 never analyses blocks");
+        check(TensuraAnalysis.allowedForEntity(viewer, gated), "mode 1 analyses mobs");
+        check(!TensuraAnalysis.allowedForBlock(viewer, gated), "mode 1 never analyses blocks");
 
         data.setAnalysisMode(2);
-        check(!TensuraAnalysis.allowedForEntity(viewer, target, gated), "mode 2 never analyses mobs");
-        check(TensuraAnalysis.allowedForBlock(viewer, targetBlock, gated), "mode 2 analyses blocks");
+        check(!TensuraAnalysis.allowedForEntity(viewer, gated), "mode 2 never analyses mobs");
+        check(TensuraAnalysis.allowedForBlock(viewer, gated), "mode 2 analyses blocks");
 
         // Any other mode analyses nothing. This is also the branch a viewer with no
         // player data takes, since a missing storage reports -1.
         data.setAnalysisMode(3);
-        check(!TensuraAnalysis.allowedForEntity(viewer, target, gated),
+        check(!TensuraAnalysis.allowedForEntity(viewer, gated),
                 "an unknown analysis mode must deny mob analysis");
-        check(!TensuraAnalysis.allowedForBlock(viewer, targetBlock, gated),
+        check(!TensuraAnalysis.allowedForBlock(viewer, gated),
                 "an unknown analysis mode must deny block analysis");
 
-        // Reach is measured from the viewer, so stepping out of range denies both.
+        // Reach plays no part in the decision, however far away the target is. Tensura's
+        // own HUD would stop dead at analysis_distance; Jade does not, so the addon's rows
+        // stay put rather than half-vanishing out of an otherwise complete tooltip.
         data.setAnalysisMode(0);
         setAttribute(viewer, TensuraAttributes.ANALYSIS_DISTANCE, 4);
         viewer.setPos(target.getX() + 64.0D, target.getY(), target.getZ());
-        check(!TensuraAnalysis.allowedForEntity(viewer, target, gated),
-                "a mob beyond the analysis distance must be denied");
-        check(!TensuraAnalysis.allowedForBlock(viewer, targetBlock, gated),
-                "a block beyond the analysis distance must be denied");
+        check(TensuraAnalysis.allowedForEntity(viewer, gated),
+                "a mob 64 blocks beyond the analysis distance must still be allowed");
+        check(TensuraAnalysis.allowedForBlock(viewer, gated),
+                "a block 64 blocks beyond the analysis distance must still be allowed");
 
         helper.succeed();
     }
@@ -445,8 +446,54 @@ public final class AnalysisGameTests {
                 "tensura:corrosion must be listed: " + abilityLines);
         check(!abilityLines.contains(learnedFarsight.getDisplayName().getString()),
                 "a mastered ability must be skipped, but it was listed: " + abilityLines);
-        check(!abilityLines.contains(Component.translatable("tensura.skill.empty").getString()),
-                "the 'no abilities' fallback must not appear when abilities were listed: " + abilityLines);
+        // No placeholder assertion belongs here any more - the panel has no such row. That a
+        // mastered-only list stays silent is pinned by
+        // {@link #mastered_only_ability_list_is_silent}, directly below.
+
+        helper.succeed();
+    }
+
+    /**
+     * A mob whose only ability is mastered qualifies for nothing, and the panel must stop at
+     * EP rather than pad itself out. Tensura's own ability widget prints its empty-slot key
+     * ("None") for exactly this situation, because an inventory slot has to show something;
+     * a tooltip row does not, and the panel used to print that placeholder here.
+     */
+    @GameTest(template = "test_area")
+    public static void mastered_only_ability_list_is_silent(GameTestHelper helper) {
+        Cow target = helper.spawn(EntityType.COW, new BlockPos(4, 1, 4));
+        Player viewer = helper.makeMockPlayer(GameType.CREATIVE);
+
+        IAbility ability = TensuraStorages.getAbilityFrom(target);
+        check(ability != null, "every living mob must expose Tensura ability storage");
+        List<AbilitySlot> slots = ability.getAbilitySlots();
+        check(slots != null && !slots.isEmpty(),
+                "a fresh mob must expose at least one ability slot");
+
+        SkillStorage skills = SkillAPI.getSkillsFrom(target);
+        ResourceLocation farsight = ResourceLocation.fromNamespaceAndPath("tensura", "farsight");
+        check(learnFree(skills, farsight), "tensura:farsight must be learnable");
+
+        // Mastered, so it is skipped - leaving nothing at all to list.
+        ManasSkillInstance learnedFarsight = learned(skills, farsight);
+        learnedFarsight.setMastery(1_000_000.0D);
+        check(learnedFarsight.isMastered(target),
+                "mastery must exceed the skill's cap before the ability can be expected to be skipped");
+
+        ability.setAbilitySlot(0, learnedFarsight.getSkill(), 0);
+
+        IPluginConfig toggles = config(values(
+                TensuraJadeConfig.RESPECT_ANALYSIS_GATING, false,
+                TensuraJadeConfig.SHOW_ABILITIES, true));
+        TooltipRecorder panel = TooltipRecorder.create();
+        TensuraAnalysis.appendEntity(panel.proxy(), entityAccessor(viewer, target), toggles, target);
+
+        int ep = indexOfLabel(panel, LABEL_EP);
+        check(ep >= 0, "the panel must reach the EP line: " + panel.texts());
+        check(panel.size() == ep + 1,
+                "a mob with nothing to list must end at EP, but it appended: " + panel.texts());
+        check(!panel.texts().contains(Component.translatable("tensura.skill.empty").getString()),
+                "no placeholder row may stand in for the abilities: " + panel.texts());
 
         helper.succeed();
     }
@@ -626,6 +673,67 @@ public final class AnalysisGameTests {
                 "failed growth replaces the growth row outright; no age line may stand beside it: "
                         + panel.texts());
         expectNoDeduplicatedLines(panel);
+
+        helper.succeed();
+    }
+
+    /**
+     * Which combinations withdraw Jade's growth percentage, pinned as a policy rather than
+     * derived. The two switches that decide it are the addon's own {@code block_analysis}
+     * and whether the plant has failed; analysis gating is deliberately not among them.
+     *
+     * <p>Each case pairs the mixin's decision with what the panel actually printed, because
+     * the failures worth catching are the mismatches - cancelling a percentage that nothing
+     * replaces leaves a viewer with no growth information in either form.</p>
+     */
+    @GameTest(template = "test_area")
+    public static void crop_percentage_suppression_policy(GameTestHelper helper) {
+        Player viewer = helper.makeMockPlayer(GameType.CREATIVE);
+        BlockPos pos = helper.absolutePos(new BlockPos(4, 1, 4));
+        Block hipokute = hipokuteBlock();
+        BlockState failed = hipokute.defaultBlockState().setValue(HipokuteGrass.AGE, 2);
+        BlockState growing = hipokute.defaultBlockState().setValue(HipokuteGrass.AGE, 1);
+
+        // Panel off: the operator has opted the whole panel out, so Jade's own wording
+        // stands untouched. (The provider is what holds the panel back in production -
+        // appendBlock does not read the toggle - so only the withdrawal is asserted here.)
+        IPluginConfig off = config(values(
+                TensuraJadeConfig.RESPECT_ANALYSIS_GATING, false,
+                TensuraJadeConfig.BLOCK_ANALYSIS, false));
+        check(!TensuraAnalysis.suppressCropPercentage(blockAccessor(viewer, helper.getLevel(), pos, failed), off),
+                "with block analysis off the panel is disabled, so Jade's percentage must stand");
+
+        IPluginConfig on = config(values(
+                TensuraJadeConfig.RESPECT_ANALYSIS_GATING, false,
+                TensuraJadeConfig.BLOCK_ANALYSIS, true));
+
+        // Panel on and the plant finished: the percentage is withdrawn and replaced.
+        check(TensuraAnalysis.suppressCropPercentage(blockAccessor(viewer, helper.getLevel(), pos, failed), on),
+                "a failed plant with the panel on must suppress the percentage");
+        TooltipRecorder panel = TooltipRecorder.create();
+        TensuraAnalysis.appendBlock(panel.proxy(), blockAccessor(viewer, helper.getLevel(), pos, failed), on);
+        expectFailedGrowth(panel, 1);
+
+        // Panel on but the plant can still grow: there is nothing to replace, so nothing is
+        // withdrawn, and Jade's percentage stays.
+        check(!TensuraAnalysis.suppressCropPercentage(blockAccessor(viewer, helper.getLevel(), pos, growing), on),
+                "a plant that can still grow must keep Jade's percentage");
+
+        // Gating denies this viewer every row - but the percentage is withdrawn all the same.
+        // A viewer may be refused the analysis and still be shown a false number by default,
+        // and declining to correct it would turn the denial into an endorsement of 67%.
+        setAttribute(viewer, TensuraAttributes.ANALYSIS_LEVEL, 0);
+        IPluginConfig denied = config(values(
+                TensuraJadeConfig.RESPECT_ANALYSIS_GATING, true,
+                TensuraJadeConfig.BLOCK_ANALYSIS, true));
+        check(!TensuraAnalysis.allowedForBlock(viewer, denied),
+                "a viewer with no analysis level must be denied block analysis");
+        check(TensuraAnalysis.suppressCropPercentage(blockAccessor(viewer, helper.getLevel(), pos, failed), denied),
+                "analysis gating must not spare the percentage - it is still wrong for this plant");
+        TooltipRecorder gated = TooltipRecorder.create();
+        TensuraAnalysis.appendBlock(gated.proxy(), blockAccessor(viewer, helper.getLevel(), pos, failed), denied);
+        check(!labelKeys(gated).contains(LABEL_FAILED_GROWTH),
+                "a denied viewer gets no rows from us at all: " + gated.texts());
 
         helper.succeed();
     }

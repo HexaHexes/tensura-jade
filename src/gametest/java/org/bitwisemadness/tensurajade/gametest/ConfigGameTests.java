@@ -8,6 +8,8 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.bitwisemadness.tensurajade.TensuraJade;
 import org.bitwisemadness.tensurajade.config.TensuraJadeConfig;
 import org.bitwisemadness.tensurajade.gametest.JadeClientRegistrationStub.RegistrationCall;
+import org.bitwisemadness.tensurajade.provider.TensuraBlockProvider;
+import org.bitwisemadness.tensurajade.provider.TensuraEntityProvider;
 import snownee.jade.impl.config.PluginConfig;
 
 import java.util.List;
@@ -18,7 +20,7 @@ import static org.bitwisemadness.tensurajade.gametest.TestSupport.check;
 /**
  * Covers the addon's configuration contract with Jade.
  *
- * <p>Two of these three are regression tests for real shipped crashes. The first: the
+ * <p>Two of these are regression tests for real shipped crashes. The first: the
  * addon once called {@code setConfigCategoryOverride(CATEGORY, ...)} during registration,
  * but Jade only accepts that for keys it has already been told about, and the group id is
  * not one of them - so the game refused to start with {@code Unknown config key}. The
@@ -137,6 +139,42 @@ public final class ConfigGameTests {
                         + registration.calls());
         check(registration.registeredIds().contains(TensuraJadeConfig.HIDE_TENSURA_OVERLAY),
                 "the suppression toggle must be exposed in Jade's settings");
+
+        helper.succeed();
+    }
+
+    /**
+     * The provider-owned keys must keep matching the providers Jade derives them from.
+     *
+     * <p>This is the invariant the duplicate-key fix rests on, and nothing else checks it.
+     * {@code register()} deliberately does <em>not</em> declare {@code entity_analysis} or
+     * {@code block_analysis}, because Jade creates those two from the providers' own
+     * {@code getUid()}. That only holds while the uid <em>is</em> the constant: change
+     * either provider's return value and Jade registers a key nobody declared, while the
+     * constant the panel and the settings screen still read is left with no entry at all -
+     * so {@code config.get(BLOCK_ANALYSIS)} throws an NPE again, with every test in this
+     * project still green.</p>
+     */
+    @GameTest(template = "test_area")
+    public static void provider_uids_own_their_keys(GameTestHelper helper) {
+        ResourceLocation entityUid = new TensuraEntityProvider().getUid();
+        ResourceLocation blockUid = new TensuraBlockProvider().getUid();
+
+        check(entityUid.equals(TensuraJadeConfig.ENTITY_ANALYSIS),
+                "TensuraEntityProvider reports " + entityUid + " but the panel and settings read "
+                        + TensuraJadeConfig.ENTITY_ANALYSIS);
+        check(blockUid.equals(TensuraJadeConfig.BLOCK_ANALYSIS),
+                "TensuraBlockProvider reports " + blockUid + " but the panel and settings read "
+                        + TensuraJadeConfig.BLOCK_ANALYSIS);
+
+        // Both must also stay undeclared here - that is what makes leaving them to Jade
+        // safe rather than merely what makes the previous test pass.
+        JadeClientRegistrationStub registration = new JadeClientRegistrationStub();
+        TensuraJadeConfig.register(registration);
+        check(!registration.registeredIds().contains(TensuraJadeConfig.ENTITY_ANALYSIS),
+                "entity_analysis must stay undeclared so Jade's own copy is the only one");
+        check(!registration.registeredIds().contains(TensuraJadeConfig.BLOCK_ANALYSIS),
+                "block_analysis must stay undeclared so Jade's own copy is the only one");
 
         helper.succeed();
     }

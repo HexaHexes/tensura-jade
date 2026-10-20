@@ -19,7 +19,6 @@ import io.github.manasmods.tensura.storage.ability.IAbility;
 import io.github.manasmods.tensura.storage.ep.IExistence;
 import io.github.manasmods.tensura.storage.player.ITensuraPlayer;
 import io.github.manasmods.tensura.util.EnergyHelper;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.TextColor;
@@ -114,7 +113,7 @@ public final class TensuraAnalysis {
 
     public static void appendEntity(ITooltip tooltip, EntityAccessor accessor, IPluginConfig config, LivingEntity entity) {
         Player viewer = accessor.getPlayer();
-        if (viewer == null || !allowedForEntity(viewer, entity, config)) {
+        if (viewer == null || !allowedForEntity(viewer, config)) {
             return;
         }
 
@@ -193,6 +192,13 @@ public final class TensuraAnalysis {
      * tooltip - so every qualifying ability is listed instead. What qualifies matches the
      * overlay exactly: slots that are filled, learned, and not yet mastered, because
      * Tensura skips mastered abilities (they are already known).
+     *
+     * <p><strong>Nothing is written when nothing qualifies.</strong> Tensura's own ability
+     * widget prints its empty-slot key ({@code tensura.skill.empty}, "None") because an
+     * inventory slot has to render as something; a tooltip row does not. A placeholder here
+     * would add a line to every mob that has no listable abilities - and that is not the
+     * same set as mobs with no abilities at all, since an entirely mastered mob qualifies
+     * for nothing. The panel simply ends after EP.</p>
      */
     private static void addAbilities(ITooltip tooltip, LivingEntity entity) {
         IAbility ability = TensuraStorages.getAbilityFrom(entity);
@@ -205,7 +211,6 @@ public final class TensuraAnalysis {
         }
 
         SkillStorage storage = SkillAPI.getSkillsFrom(entity);
-        int shown = 0;
         for (AbilitySlot slot : slots) {
             if (slot == null || slot.isEmpty()) {
                 continue;
@@ -229,11 +234,6 @@ public final class TensuraAnalysis {
             MutableComponent line = name.copy();
             line.withStyle(style -> style.withColor(colour));
             tooltip.add(line);
-            shown++;
-        }
-
-        if (shown == 0) {
-            tooltip.add(Component.translatable("tensura.skill.empty"));
         }
     }
 
@@ -269,8 +269,7 @@ public final class TensuraAnalysis {
         if (!(accessor.getPlayer() instanceof Player viewer)) {
             return;
         }
-        BlockPos pos = accessor.getPosition();
-        if (pos == null || !allowedForBlock(viewer, pos, config)) {
+        if (!allowedForBlock(viewer, config)) {
             return;
         }
 
@@ -322,49 +321,81 @@ public final class TensuraAnalysis {
         return state.hasProperty(age) && state.getValue(age) == HIPROKUTE_FAILED_AGE;
     }
 
+    /**
+     * Whether Jade's crop-progress row should be cancelled for this block: true exactly
+     * when the panel above has printed the {@code Failed Growth} line the percentage would
+     * otherwise contradict.
+     *
+     * <p><strong>Only the addon's own switch suppresses.</strong> {@link #appendBlock} is
+     * also asked {@link #allowedForBlock}, and a viewer whose analysis is gated out gets no
+     * rows from us at all - yet their percentage is cancelled regardless. That asymmetry is
+     * deliberate: gating decides what else Tensura is willing to reveal (existence points,
+     * abilities), not whether {@code 67%} is a true statement about a plant that will never
+     * grow again. Denying a viewer the analysis does not make the false number correct, so
+     * the row is withdrawn from them too and nothing replaces it. {@code block_analysis} is
+     * different in kind - it is the operator opting the panel out altogether - so with it
+     * off Jade's content is left exactly as Jade writes it.</p>
+     *
+     * <p>Named for what the mixin does with it rather than for what it computes, so the
+     * call site reads as the decision it is.</p>
+     */
+    public static boolean suppressCropPercentage(BlockAccessor accessor, IPluginConfig config) {
+        return config.get(TensuraJadeConfig.BLOCK_ANALYSIS) && reportsFailedGrowth(accessor.getBlockState());
+    }
+
     // ---------------------------------------------------------------------
-    // Analysis gating - mirrors Tensura's own pre_renderAnalysis() conditions
+    // Analysis gating - Tensura's pre_renderAnalysis() conditions, minus its reach limit
     // ---------------------------------------------------------------------
 
     /**
-     * Whether the viewer is entitled to this reading at all.
+     * Whether the viewer is entitled to entity analysis at all.
      *
      * <p>Tensura gates its overlay on the {@code analysis_level} and
      * {@code analysis_distance} attributes both being positive, then on the analysis
      * mode: {@code 0} analyses whatever is aimed at (mobs win over blocks), {@code 1}
      * mobs only, {@code 2} blocks only. Missing player data means no analysis.</p>
+     *
+     * <p><strong>The reach limit is deliberately not mirrored.</strong> Tensura picks its
+     * target with {@code getTargetingEntity(player, analysisDistance, ...)} and its block
+     * with a raycast of the same length, so its own HUD stops dead at
+     * {@code analysis_distance} - 5 blocks by default, with the attribute topping out at
+     * 1024. Jade does not stop there: it validates entity data out to
+     * {@code entityInteractionRange() + 21}, roughly 24. Comparing distances here would
+     * leave a band in which Jade's own rows - name, health, effects, NBT - stay on screen
+     * while ours vanish, and a tooltip that half-disappears is worse than analysis
+     * reaching a little further than the HUD would. The attribute is still consulted:
+     * {@code analysis_distance <= 0} is Tensura's own statement that this viewer has no
+     * analysis to spend, and that is kept.</p>
+     *
+     * <p>Which makes the parameter list a statement rather than an omission: the answer
+     * depends only on the viewer, never on what is being looked at.</p>
      */
-    public static boolean allowedForEntity(Player viewer, LivingEntity target, IPluginConfig config) {
+    public static boolean allowedForEntity(Player viewer, IPluginConfig config) {
         if (!config.get(TensuraJadeConfig.RESPECT_ANALYSIS_GATING)) {
             return true;
         }
-        int distance = analysisDistance(viewer);
-        if (analysisLevel(viewer) <= 0 || distance <= 0) {
+        if (analysisLevel(viewer) <= 0 || analysisDistance(viewer) <= 0) {
             return false;
         }
         int mode = analysisMode(viewer);
-        if (mode != 0 && mode != 1) {
-            return false;
-        }
-        return viewer.distanceTo(target) <= (float) distance;
+        return mode == 0 || mode == 1;
     }
 
-    public static boolean allowedForBlock(Player viewer, BlockPos pos, IPluginConfig config) {
+    /**
+     * As {@link #allowedForEntity}, for blocks: analysis mode {@code 0} or {@code 2},
+     * never {@code 1}. The reach limit is dropped here for the same reason, and it is just
+     * as visible - Jade keeps reporting a block long past the raycast Tensura would have
+     * cast at it.
+     */
+    public static boolean allowedForBlock(Player viewer, IPluginConfig config) {
         if (!config.get(TensuraJadeConfig.RESPECT_ANALYSIS_GATING)) {
             return true;
         }
-        int distance = analysisDistance(viewer);
-        if (analysisLevel(viewer) <= 0 || distance <= 0) {
+        if (analysisLevel(viewer) <= 0 || analysisDistance(viewer) <= 0) {
             return false;
         }
         int mode = analysisMode(viewer);
-        if (mode != 0 && mode != 2) {
-            return false;
-        }
-        double dx = pos.getX() + 0.5D - viewer.getX();
-        double dy = pos.getY() + 0.5D - viewer.getEyeY();
-        double dz = pos.getZ() + 0.5D - viewer.getZ();
-        return dx * dx + dy * dy + dz * dz <= (double) distance * (double) distance;
+        return mode == 0 || mode == 2;
     }
 
     private static int analysisLevel(Player viewer) {

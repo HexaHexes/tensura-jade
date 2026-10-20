@@ -27,8 +27,14 @@ import snownee.jade.api.config.IPluginConfig;
  * <p><strong>The whole method is cancelled, deliberately.</strong> Its only job is to
  * append the crop-progress row, so there is no neighbouring content to lose. Cancelling
  * rather than filtering keeps the decision in one place:
- * {@link TensuraAnalysis#reportsFailedGrowth}, shared with the block panel that prints the
- * replacement line, cannot drift from the suppression that makes room for it.</p>
+ * {@link TensuraAnalysis#suppressCropPercentage} - which also answers to the block panel,
+ * so the two cannot drift from the suppression that makes room for it.
+ *
+ * <p>Note what that predicate does not do: it does not fire whenever a percentage would be
+ * wrong, only whenever this addon is in a position to replace one. With
+ * {@code tensura_jade.block_analysis} off the panel is disabled and Jade's own wording is
+ * left untouched. Gated-out viewers are the exception, and deliberately so - see the
+ * predicate's own note.</p>
  *
  * <p>Client-only by construction: the mixin config lists this class under
  * {@code "client"}, and a Jade tooltip is only ever assembled on the client.</p>
@@ -50,7 +56,7 @@ public final class CropProgressProviderMixin {
                                                             BlockAccessor accessor,
                                                             IPluginConfig config,
                                                             CallbackInfo ci) {
-        if (TensuraAnalysis.reportsFailedGrowth(accessor.getBlockState())) {
+        if (TensuraAnalysis.suppressCropPercentage(accessor, config)) {
             ci.cancel();
         }
     }

@@ -8,6 +8,7 @@ import io.github.manasmods.manascore.skill.api.ManasSkill;
 import io.github.manasmods.manascore.skill.api.ManasSkillInstance;
 import io.github.manasmods.manascore.skill.api.SkillAPI;
 import io.github.manasmods.manascore.skill.impl.SkillStorage;
+import io.github.manasmods.tensura.block.HipokuteGrass;
 import io.github.manasmods.tensura.block.entity.CharybdisCoreBlockEntity;
 import io.github.manasmods.tensura.entity.template.subclass.ILivingPartEntity;
 import io.github.manasmods.tensura.registry.attribute.TensuraAttributes;
@@ -26,12 +27,10 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
-import net.minecraft.world.level.block.state.properties.Property;
 import org.bitwisemadness.tensurajade.config.TensuraJadeConfig;
 import snownee.jade.api.BlockAccessor;
 import snownee.jade.api.EntityAccessor;
@@ -70,17 +69,20 @@ public final class TensuraAnalysis {
     private static final String LABEL_EP = "tensura.attribute.existence_points.shortened_name";
     private static final String LABEL_ALIGNMENT = "tensura_jade.alignment";
 
-    // --- Block line labels.
-    private static final String LABEL_HARDNESS = "tensura.attribute.block.hardness";
-    private static final String LABEL_CORRECT_TOOL = "tensura.attribute.block.correct_tool";
+    // --- Block line labels. Only the lines Jade has no equivalent for; see appendBlock.
     private static final String LABEL_EXPLOSION_RES = "tensura.attribute.block.explosion_resistance";
-    private static final String LABEL_LIGHT = "tensura.attribute.block.light_level";
     private static final String LABEL_BLOCK_EP = "tensura.attribute.existence_points";
-    private static final String LABEL_REDSTONE = "tensura.attribute.block.redstone_strength";
-    private static final String LABEL_AGE = "tensura.attribute.block.age";
+    private static final String LABEL_EGG_HATCH = "tensura.attribute.block.egg_hatch";
+    private static final String LABEL_FAILED_GROWTH = "tensura.attribute.block.failed_growth";
 
     /** Tensura paints an uncoloured ability name red; uncoloured means "not yet known". */
     private static final int DEFAULT_ABILITY_COLOUR = 0xFF0000;
+
+    /** Tensura's {@code 16733525}: the orange it prints "Failed Growth" in. */
+    private static final int FAILED_GROWTH_COLOUR = 0xFF5555;
+
+    /** Age at which {@code HipokuteGrass} counts as failed - the top of its {@code AGE_3}. */
+    private static final int HIPROKUTE_FAILED_AGE = 2;
 
     private TensuraAnalysis() {
     }
@@ -240,19 +242,25 @@ public final class TensuraAnalysis {
     // ---------------------------------------------------------------------
 
     /**
-     * <p>Two calls here are deprecated in the vanilla mappings, and are kept
-     * deliberately: {@code Block#getExplosionResistance()} and
-     * {@code Player#hasCorrectToolForDrops(BlockState)} are exactly the methods
-     * Tensura's own {@code renderBlockAnalysis()} uses. Substituting their successors
-     * would risk computing numbers that differ from the overlay this panel replaces.</p>
+     * <p>{@code Block#getExplosionResistance()} is read straight off the block rather than
+     * recomputed, because it is exactly what Tensura's own {@code renderBlockAnalysis}
+     * reads - substituting any equivalent would risk a number that differs from the
+     * overlay this panel replaces.</p>
+     *
+     * <p><strong>What is absent, and why.</strong> Hardness and correct tool are dropped
+     * because Jade's harvest-tool provider already reports them (unbreakable blocks
+     * included, once {@code minecraft:harvest_tool.show_unbreakable} is on); light level is
+     * left to More Overlays; and crop age and redstone power are dropped because Jade's own
+     * crop-progress and redstone providers read the very state properties Tensura reads, so
+     * emitting them here would state each fact twice inside one tooltip. What remains is the
+     * analysis Jade has no equivalent for.</p>
      *
      * <p>The viewer is accepted as {@link Player} rather than narrowed to the client's
-     * {@code LocalPlayer}: only the tool-drop check is needed, which lives on
-     * {@code Player}, and accepting the wider type lets this method run under a headless
+     * {@code LocalPlayer} only to feed Tensura's own gating check, which takes a
+     * {@code Player} - and accepting the wider type lets this method run under a headless
      * game test server. Jade tooltips only ever render client-side, so the widened check
      * behaves identically in production.</p>
      */
-    @SuppressWarnings("deprecation")
     public static void appendBlock(ITooltip tooltip, BlockAccessor accessor, IPluginConfig config) {
         BlockState state = accessor.getBlockState();
         if (state == null || state.isAir()) {
@@ -267,39 +275,51 @@ public final class TensuraAnalysis {
         }
 
         Block block = state.getBlock();
-        Level level = accessor.getLevel();
-
-        // Hardness: Tensura substitutes the vanilla "Unbreakable" text below zero.
-        float hardness = block.defaultDestroyTime();
-        if (hardness < 0.0F) {
-            addStat(tooltip, LABEL_HARDNESS, Component.translatable("item.unbreakable"));
-        } else {
-            addStat(tooltip, LABEL_HARDNESS, Component.literal(Float.toString(hardness)));
-        }
-
         addStat(tooltip, LABEL_EXPLOSION_RES, Component.literal(Float.toString(block.getExplosionResistance())));
-
-        if (level != null) {
-            int light = Math.max(level.getBrightness(LightLayer.BLOCK, pos), level.getBrightness(LightLayer.SKY, pos));
-            addStat(tooltip, LABEL_LIGHT, Component.literal(Integer.toString(light)));
-        }
-
-        addStat(tooltip, LABEL_CORRECT_TOOL,
-                Component.translatable(viewer.hasCorrectToolForDrops(state) ? "gui.yes" : "gui.no"));
-
-        addIntegerProperty(tooltip, state, "age", LABEL_AGE);
-        addIntegerProperty(tooltip, state, "power", LABEL_REDSTONE);
 
         if (accessor.getBlockEntity() instanceof CharybdisCoreBlockEntity core) {
             addStat(tooltip, LABEL_BLOCK_EP, shortenedNumber(core.getEP()));
         }
+
+        if (state.hasProperty(BlockStateProperties.HATCH)) {
+            addStat(tooltip, LABEL_EGG_HATCH,
+                    Component.literal(Integer.toString(state.getValue(BlockStateProperties.HATCH))));
+        }
+
+        // Bare, unlabelled: Tensura draws "Failed Growth" as the value under its "Age"
+        // row, and the percentage this replaces has been cancelled for this block by
+        // CropProgressProviderMixin - so there is no label on the other side to pair with.
+        if (reportsFailedGrowth(state)) {
+            tooltip.add(Component.translatable(LABEL_FAILED_GROWTH)
+                    .withStyle(style -> style.withColor(TextColor.fromRgb(FAILED_GROWTH_COLOUR))));
+        }
     }
 
-    private static void addIntegerProperty(ITooltip tooltip, BlockState state, String name, String labelKey) {
-        Property<?> property = state.getBlock().getStateDefinition().getProperty(name);
-        if (property instanceof IntegerProperty integer && state.hasProperty(integer)) {
-            addStat(tooltip, labelKey, Component.literal(Integer.toString(state.getValue(integer))));
+    /**
+     * Whether Tensura would report {@code Failed Growth} instead of a growth percentage for
+     * this block - one test behind both this panel's line and the mixin that hides Jade's.
+     *
+     * <p>Mirrors {@code OverlayHandler#renderBlockAnalysis}, which tests the block against
+     * {@code HipokuteGrass}, reads its own {@code getAgeProperty()} - vanilla {@code AGE_3},
+     * named {@code "age"}, running 0..3 - and compares it against the literal {@code 2}.
+     * That 2 is the last stage the plant can reach: its own {@code randomTick} returns as
+     * soon as {@code age >= 2}, so 2 marks a plant that has stopped growing even though the
+     * property permits one value more. Jade's percentage is suppressed on exactly this
+     * condition because Jade scales the age by a constant chosen for the property - 3.0 for
+     * {@code AGE_3} - rather than by how far the plant can actually grow, so it reports
+     * {@code 2/3 = 67%} for a plant that will never grow again, and a green "67%" beside an
+     * orange "Failed Growth" would contradict itself.</p>
+     *
+     * <p>Held here so the panel and the mixin cannot drift apart: the signature stays
+     * vanilla-only even though the body needs Tensura, exactly as {@link #appendBlock} does
+     * with {@code CharybdisCoreBlockEntity}.</p>
+     */
+    public static boolean reportsFailedGrowth(BlockState state) {
+        if (state == null || !(state.getBlock() instanceof HipokuteGrass hipokute)) {
+            return false;
         }
+        IntegerProperty age = hipokute.getAgeProperty();
+        return state.hasProperty(age) && state.getValue(age) == HIPROKUTE_FAILED_AGE;
     }
 
     // ---------------------------------------------------------------------

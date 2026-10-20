@@ -6,6 +6,7 @@
   "plugin": "org.bitwisemadness.tensurajade.mixin.TensuraJadeMixinPlugin",
 
   "client": [
+    "CropProgressProviderMixin",
     "OverlayHandlerMixin"
   ],
 

@@ -5,6 +5,7 @@ import io.github.manasmods.manascore.race.api.Races;
 import io.github.manasmods.manascore.skill.api.ManasSkillInstance;
 import io.github.manasmods.manascore.skill.api.SkillAPI;
 import io.github.manasmods.manascore.skill.impl.SkillStorage;
+import io.github.manasmods.tensura.block.HipokuteGrass;
 import io.github.manasmods.tensura.entity.multipart.LivingMultipartBody;
 import io.github.manasmods.tensura.entity.template.subclass.ILivingPartEntity;
 import io.github.manasmods.tensura.registry.attribute.TensuraAttributes;
@@ -21,6 +22,7 @@ import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextColor;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -29,10 +31,11 @@ import net.minecraft.world.entity.animal.Cow;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -82,13 +85,27 @@ public final class AnalysisGameTests {
     private static final String LABEL_MAGICULE = "tensura.attribute.magicule.shortened_name";
     private static final String LABEL_EP = "tensura.attribute.existence_points.shortened_name";
 
-    // --- Block panel labels (Tensura's own keys).
-    private static final String LABEL_HARDNESS = "tensura.attribute.block.hardness";
+    // --- Block panel labels (Tensura's own keys). Only the rows Jade has no equivalent
+    // for are emitted; see DEDUPLICATED_LABELS for what is deliberately left out.
     private static final String LABEL_EXPLOSION_RES = "tensura.attribute.block.explosion_resistance";
-    private static final String LABEL_LIGHT = "tensura.attribute.block.light_level";
-    private static final String LABEL_CORRECT_TOOL = "tensura.attribute.block.correct_tool";
-    private static final String LABEL_AGE = "tensura.attribute.block.age";
-    private static final String LABEL_REDSTONE = "tensura.attribute.block.redstone_strength";
+    private static final String LABEL_EGG_HATCH = "tensura.attribute.block.egg_hatch";
+    private static final String LABEL_FAILED_GROWTH = "tensura.attribute.block.failed_growth";
+
+    /**
+     * Every block key the panel must <em>not</em> emit, because something else already
+     * says it: Jade's harvest-tool provider for hardness and correct tool, More Overlays
+     * for light level, and Jade's own redstone and crop-progress providers for the last
+     * two - each of which reads the very state property Tensura used to read here.
+     */
+    private static final List<String> DEDUPLICATED_LABELS = List.of(
+            "tensura.attribute.block.hardness",
+            "tensura.attribute.block.correct_tool",
+            "tensura.attribute.block.light_level",
+            "tensura.attribute.block.age",
+            "tensura.attribute.block.redstone_strength");
+
+    /** Tensura's {@code 16733525}: the orange it draws the failed-growth row in. */
+    private static final int FAILED_GROWTH_COLOUR = 0xFF5555;
 
     private AnalysisGameTests() {
     }
@@ -494,55 +511,241 @@ public final class AnalysisGameTests {
     // ---------------------------------------------------------------------
 
     /**
-     * The block panel reports hardness, explosion resistance, light, whether the viewer
-     * holds the right tool, and any integer state property the block has - in that
-     * order, with Tensura's own keys. A crop's age appears; its lack of a power property
-     * means no redstone line may be emitted at all.
+     * The block panel carries exactly the analysis Jade cannot report: explosion
+     * resistance, always, and nothing else for an ordinary block.
+     *
+     * <p>Hardness, correct tool, light level, age and redstone strength are asserted
+     * <em>absent</em> rather than merely left untested - see {@link #DEDUPLICATED_LABELS}.
+     * Bedrock is the sharp case: its below-zero hardness used to become vanilla's
+     * "Unbreakable" text here, which is now {@code jade:harvest_tool}'s to say.</p>
      */
     @GameTest(template = "test_area")
     public static void block_panel_lines(GameTestHelper helper) {
         Player viewer = helper.makeMockPlayer(GameType.CREATIVE);
         IPluginConfig toggles = config(values(TensuraJadeConfig.RESPECT_ANALYSIS_GATING, false));
 
+        // Premise for the age row: a crop really does carry an "age" property, so its
+        // absence below is a deliberate omission and not an accident of the block.
         BlockPos cropPos = new BlockPos(4, 1, 4);
         helper.setBlock(cropPos, Blocks.WHEAT.defaultBlockState().setValue(CropBlock.AGE, 3));
         BlockState crop = helper.getBlockState(cropPos);
-        BlockPos cropWorldPos = helper.absolutePos(cropPos);
+        check(crop.getBlock().getStateDefinition().getProperty("age") != null,
+                "wheat must carry an \"age\" property for this test to mean anything");
 
         TooltipRecorder panel = TooltipRecorder.create();
         TensuraAnalysis.appendBlock(panel.proxy(),
-                blockAccessor(viewer, helper.getLevel(), cropWorldPos, crop), toggles);
+                blockAccessor(viewer, helper.getLevel(), helper.absolutePos(cropPos), crop), toggles);
+        check(panel.size() == 1,
+                "a crop should report explosion resistance only, got " + panel.texts());
+        expectStat(panel, 0, LABEL_EXPLOSION_RES, Float.toString(Blocks.WHEAT.getExplosionResistance()));
+        expectNoDeduplicatedLines(panel);
 
-        check(panel.size() == 5,
-                "expected hardness/explosion/light/correct-tool/age and no redstone line, got " + panel.texts());
-        expectStat(panel, 0, LABEL_HARDNESS, Float.toString(Blocks.WHEAT.defaultDestroyTime()));
-        expectStat(panel, 1, LABEL_EXPLOSION_RES, Float.toString(Blocks.WHEAT.getExplosionResistance()));
-        int light = Math.max(
-                helper.getLevel().getBrightness(LightLayer.BLOCK, cropWorldPos),
-                helper.getLevel().getBrightness(LightLayer.SKY, cropWorldPos));
-        expectStat(panel, 2, LABEL_LIGHT, Integer.toString(light));
-        expectStat(panel, 3, LABEL_CORRECT_TOOL,
-                Component.translatable(viewer.hasCorrectToolForDrops(crop) ? "gui.yes" : "gui.no").getString());
-        expectStat(panel, 4, LABEL_AGE, "3");
-        check(!labelKeys(panel).contains(LABEL_REDSTONE),
-                "wheat has no power property, so no redstone line may be emitted: " + panel.texts());
-        check(labelKeys(panel).equals(List.of(
-                        LABEL_HARDNESS, LABEL_EXPLOSION_RES, LABEL_LIGHT, LABEL_CORRECT_TOOL, LABEL_AGE)),
-                "block label order was " + labelKeys(panel));
-
-        // Below-zero hardness is vanilla's "Unbreakable" text, exactly as the overlay prints it.
+        // Bedrock: hardness below zero, which the panel used to render as "Unbreakable".
         BlockPos bedrockPos = new BlockPos(2, 1, 2);
         helper.setBlock(bedrockPos, Blocks.BEDROCK);
         BlockState bedrock = helper.getBlockState(bedrockPos);
+        check(bedrock.getBlock().defaultDestroyTime() < 0.0F,
+                "bedrock must still be below zero hardness for this premise");
         TooltipRecorder unbreakable = TooltipRecorder.create();
         TensuraAnalysis.appendBlock(unbreakable.proxy(),
                 blockAccessor(viewer, helper.getLevel(), helper.absolutePos(bedrockPos), bedrock), toggles);
-        expectStat(unbreakable, 0, LABEL_HARDNESS, Component.translatable("item.unbreakable").getString());
-        check(unbreakable.size() == 4,
-                "bedrock has neither an age nor a power property, so four lines are expected: "
-                        + unbreakable.texts());
+        check(unbreakable.size() == 1,
+                "bedrock should report explosion resistance only, got " + unbreakable.texts());
+        expectStat(unbreakable, 0, LABEL_EXPLOSION_RES, Float.toString(Blocks.BEDROCK.getExplosionResistance()));
+        expectNoDeduplicatedLines(unbreakable);
+        String unbreakableText = Component.translatable("item.unbreakable").getString();
+        check(unbreakable.texts().stream().noneMatch(text -> text.contains(unbreakableText)),
+                "the panel must not judge bedrock's own hardness; Jade's harvest-tool provider "
+                        + "carries that marker: " + unbreakable.texts());
 
         helper.succeed();
+    }
+
+    /**
+     * Egg hatching appears only where the block carries {@code hatch} - Tensura's own
+     * condition, keyed on the very field it reads - and in the position it occupies
+     * relative to the rest of the panel.
+     */
+    @GameTest(template = "test_area")
+    public static void block_panel_hatching(GameTestHelper helper) {
+        Player viewer = helper.makeMockPlayer(GameType.CREATIVE);
+        IPluginConfig toggles = config(values(TensuraJadeConfig.RESPECT_ANALYSIS_GATING, false));
+
+        BlockPos eggPos = new BlockPos(4, 1, 4);
+        BlockState eggState = Blocks.TURTLE_EGG.defaultBlockState().setValue(BlockStateProperties.HATCH, 2);
+        check(eggState.hasProperty(BlockStateProperties.HATCH),
+                "Blocks.TURTLE_EGG must carry the hatch property this row is keyed on");
+        helper.setBlock(eggPos, eggState);
+        BlockState egg = helper.getBlockState(eggPos);
+
+        TooltipRecorder panel = TooltipRecorder.create();
+        TensuraAnalysis.appendBlock(panel.proxy(),
+                blockAccessor(viewer, helper.getLevel(), helper.absolutePos(eggPos), egg), toggles);
+
+        check(panel.size() == 2,
+                "a turtle egg should report explosion resistance and hatching, got " + panel.texts());
+        expectStat(panel, 0, LABEL_EXPLOSION_RES, Float.toString(Blocks.TURTLE_EGG.getExplosionResistance()));
+        expectStat(panel, 1, LABEL_EGG_HATCH, Integer.toString(egg.getValue(BlockStateProperties.HATCH)));
+        expectNoDeduplicatedLines(panel);
+
+        helper.succeed();
+    }
+
+    /**
+     * The row that stands in for Jade's growth percentage: bare - no label, no value
+     * shape - in Tensura's own orange, and absent while the plant can still grow.
+     *
+     * <p>Both states are passed unplaced. The panel reads only the state the accessor
+     * hands it, so placing the grass would fold the test area's floor and light into a
+     * test about nothing but the state.</p>
+     */
+    @GameTest(template = "test_area")
+    public static void failed_growth_replaces_growth_percentage(GameTestHelper helper) {
+        Player viewer = helper.makeMockPlayer(GameType.CREATIVE);
+        IPluginConfig toggles = config(values(TensuraJadeConfig.RESPECT_ANALYSIS_GATING, false));
+        BlockPos pos = helper.absolutePos(new BlockPos(4, 1, 4));
+        Block hipokute = hipokuteBlock();
+
+        BlockState growing = hipokute.defaultBlockState().setValue(HipokuteGrass.AGE, 1);
+        TooltipRecorder early = TooltipRecorder.create();
+        TensuraAnalysis.appendBlock(early.proxy(),
+                blockAccessor(viewer, helper.getLevel(), pos, growing), toggles);
+        check(early.size() == 1,
+                "an unfinished hipokute should report explosion resistance only, got " + early.texts());
+        expectNoDeduplicatedLines(early);
+
+        BlockState failed = hipokute.defaultBlockState().setValue(HipokuteGrass.AGE, 2);
+        TooltipRecorder panel = TooltipRecorder.create();
+        TensuraAnalysis.appendBlock(panel.proxy(),
+                blockAccessor(viewer, helper.getLevel(), pos, failed), toggles);
+        check(panel.size() == 2,
+                "a failed hipokute should report explosion resistance and failed growth, got " + panel.texts());
+        expectStat(panel, 0, LABEL_EXPLOSION_RES, Float.toString(hipokute.getExplosionResistance()));
+        expectFailedGrowth(panel, 1);
+        check(!labelKeys(panel).contains("tensura.attribute.block.age"),
+                "failed growth replaces the growth row outright; no age line may stand beside it: "
+                        + panel.texts());
+        expectNoDeduplicatedLines(panel);
+
+        helper.succeed();
+    }
+
+    /**
+     * The predicate both the block panel and the mixin that hides Jade's percentage
+     * depend on, pinned to the exact comparison Tensura makes.
+     *
+     * <p>Tensura's {@code renderBlockAnalysis} tests {@code instanceof HipokuteGrass},
+     * reads {@code getAgeProperty()} and compares it against the literal {@code 2}. That 2
+     * is the last stage the plant can reach at all - its own {@code randomTick} returns as
+     * soon as {@code age >= 2} - so it marks a finished plant even though the age property
+     * runs one value higher. Nothing here may drift from that literal: the cancelled
+     * percentage and the row that replaces it must switch on precisely one condition.</p>
+     */
+    @GameTest(template = "test_area")
+    public static void reports_failed_growth_matches_tensura(GameTestHelper helper) {
+        Block hipokute = hipokuteBlock();
+
+        // Read out of Tensura's bytecode, deliberately not expressed as HipokuteGrass.MAX_AGE:
+        // that constant is the age property's top value (3), while the plant's growth tick
+        // stops at 2, and only 2 is what Tensura's overlay prints.
+        final int tensuraFailedAge = 2;
+
+        check("age".equals(HipokuteGrass.AGE.getName()),
+                "Tensura locates growth by the property name \"age\", but it is now named "
+                        + HipokuteGrass.AGE.getName());
+        check(HipokuteGrass.MAX_AGE == 3,
+                "hipokute's age property is expected to span 0..3, but HipokuteGrass.MAX_AGE is "
+                        + HipokuteGrass.MAX_AGE + "; the literal " + tensuraFailedAge + " Tensura "
+                        + "renders as Failed Growth may no longer be the plant's last reachable "
+                        + "stage - revisit reportsFailedGrowth");
+
+        for (int age = 0; age <= HipokuteGrass.MAX_AGE; age++) {
+            BlockState state = hipokute.defaultBlockState().setValue(HipokuteGrass.AGE, age);
+            boolean expected = age == tensuraFailedAge;
+            check(TensuraAnalysis.reportsFailedGrowth(state) == expected,
+                    "hipokute at age " + age + " reported growth failure as "
+                            + TensuraAnalysis.reportsFailedGrowth(state) + " but expected " + expected);
+        }
+
+        // A mature crop also sits at the top of its range and also carries an "age"
+        // property; Tensura only prints failed growth for HipokuteGrass, so neither may
+        // the predicate.
+        BlockState matureWheat = Blocks.WHEAT.defaultBlockState().setValue(CropBlock.AGE, 3);
+        check(!TensuraAnalysis.reportsFailedGrowth(matureWheat),
+                "a mature crop is not a failed hipokute");
+        check(!TensuraAnalysis.reportsFailedGrowth(Blocks.BEDROCK.defaultBlockState()),
+                "a block with no age property at all cannot have failed to grow");
+
+        helper.succeed();
+    }
+
+    /**
+     * Redstone power used to be printed here too. It is left to Jade, which reads the
+     * very same {@code power} property - so a block that carries it gets no line from
+     * this panel at all.
+     */
+    @GameTest(template = "test_area")
+    public static void redstone_line_is_omitted(GameTestHelper helper) {
+        Player viewer = helper.makeMockPlayer(GameType.CREATIVE);
+        IPluginConfig toggles = config(values(TensuraJadeConfig.RESPECT_ANALYSIS_GATING, false));
+
+        // Premise: this block really does carry the property Tensura used to read, so
+        // the absence below is an omission rather than an irrelevant block.
+        BlockState wire = Blocks.REDSTONE_WIRE.defaultBlockState();
+        check(wire.hasProperty(BlockStateProperties.POWER),
+                "redstone wire must carry the power property for this test to mean anything");
+
+        TooltipRecorder panel = TooltipRecorder.create();
+        TensuraAnalysis.appendBlock(panel.proxy(),
+                blockAccessor(viewer, helper.getLevel(), helper.absolutePos(new BlockPos(4, 1, 4)), wire),
+                toggles);
+        check(panel.size() == 1,
+                "a redstone wire should report explosion resistance only, got " + panel.texts());
+        expectNoDeduplicatedLines(panel);
+
+        helper.succeed();
+    }
+
+    // ---------------------------------------------------------------------
+    // Block panel helpers
+    // ---------------------------------------------------------------------
+
+    /** Asserts the panel says none of the things Jade or More Overlays already say. */
+    private static void expectNoDeduplicatedLines(TooltipRecorder panel) {
+        List<String> present = labelKeys(panel);
+        for (String deduplicated : DEDUPLICATED_LABELS) {
+            check(!present.contains(deduplicated),
+                    "the panel emitted <" + deduplicated + ">, which another mod already reports: "
+                            + panel.texts());
+        }
+    }
+
+    /**
+     * Asserts the failed-growth row: the Tensura translatable, unlabelled and unvalued,
+     * in Tensura's own orange. Unlike every other row it is not a
+     * {@code "<label>: <value>"} line, so {@code expectStat} cannot describe it.
+     */
+    private static void expectFailedGrowth(TooltipRecorder panel, int index) {
+        Component line = panel.line(index);
+        String expected = Component.translatable(LABEL_FAILED_GROWTH).getString();
+        check(expected.equals(line.getString()),
+                "line " + index + " was <" + line.getString() + "> but the failed-growth row is bare <"
+                        + expected + "> (full panel: " + panel.texts() + ")");
+        TextColor colour = line.getStyle().getColor();
+        check(colour != null && colour.getValue() == FAILED_GROWTH_COLOUR,
+                "failed growth must be Tensura's orange 0x" + Integer.toHexString(FAILED_GROWTH_COLOUR)
+                        + " but the row's colour was " + colour);
+    }
+
+    /** Tensura's hipokute grass, failing loudly if the registry no longer has it. */
+    private static Block hipokuteBlock() {
+        Block block = BuiltInRegistries.BLOCK.get(ResourceLocation.fromNamespaceAndPath("tensura", "hipokute_grass"));
+        check(block != null && block != Blocks.AIR,
+                "tensura:hipokute_grass must be registered - the failed-growth row is keyed on it");
+        check(block instanceof HipokuteGrass,
+                "tensura:hipokute_grass is a " + block.getClass().getSimpleName()
+                        + ", but failed growth is keyed on HipokuteGrass");
+        return block;
     }
 
     // ---------------------------------------------------------------------

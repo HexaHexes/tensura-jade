@@ -18,12 +18,16 @@ import static org.bitwisemadness.tensurajade.gametest.TestSupport.check;
 /**
  * Covers the addon's configuration contract with Jade.
  *
- * <p>The first of these three is the regression test for a real shipped crash: the addon
- * once called {@code setConfigCategoryOverride(CATEGORY, ...)} during registration, but
- * Jade only accepts that for keys it has already been told about, and the group id is not
- * one of them - so the game refused to start with {@code Unknown config key}. The stub
- * reproduces Jade's precondition exactly, so re-adding that line fails here instead of in
- * front of a player.</p>
+ * <p>Two of these three are regression tests for real shipped crashes. The first: the
+ * addon once called {@code setConfigCategoryOverride(CATEGORY, ...)} during registration,
+ * but Jade only accepts that for keys it has already been told about, and the group id is
+ * not one of them - so the game refused to start with {@code Unknown config key}. The
+ * stub reproduces Jade's precondition exactly, so re-adding that line fails here instead
+ * of in front of a player. The second: {@code register()} used to declare all five
+ * toggles, including the two Jade derives from the providers' {@code getUid()} during
+ * {@code ClientRegistrationSession.end()} - and because that pass runs before the queued
+ * entries are flushed, the second copy was rejected with {@code Duplicate config key},
+ * the flush was abandoned, and the remaining toggles never existed.</p>
  *
  * <p>These use a hand-written stub rather than a {@link java.lang.reflect.Proxy}: a proxy
  * enumerates the interface's methods, which loads the client-only {@code Screen} type Jade
@@ -38,8 +42,18 @@ public final class ConfigGameTests {
     }
 
     /**
-     * Registering the toggles completes without Jade refusing any key, and declares
-     * exactly the five documented settings with all of them on by default.
+     * Registering the toggles completes without Jade refusing any key, declares the three
+     * settings this addon alone owns with all of them on by default - and leaves
+     * {@code entity_analysis} and {@code block_analysis} for Jade to create.
+     *
+     * <p>The last clause is the regression test for a real shipped crash. Jade registers
+     * those two keys itself from {@code TensuraEntityProvider} and
+     * {@code TensuraBlockProvider} while ending its registration session, and it does so
+     * <em>before</em> flushing the entries queued here. Naming them here as well therefore
+     * reached {@code PluginConfig.addConfig} a second time, which threw
+     * {@code Duplicate config key} and aborted the flush - leaving
+     * {@code respect_analysis_gating}, read on every analysis line, unregistered, so every
+     * read of it was an NPE.</p>
      */
     @GameTest(template = "test_area")
     public static void config_registration_completes(GameTestHelper helper) {
@@ -47,13 +61,19 @@ public final class ConfigGameTests {
         TensuraJadeConfig.register(registration);
 
         Set<ResourceLocation> expected = Set.of(
-                TensuraJadeConfig.ENTITY_ANALYSIS,
-                TensuraJadeConfig.BLOCK_ANALYSIS,
                 TensuraJadeConfig.SHOW_ABILITIES,
                 TensuraJadeConfig.HIDE_TENSURA_OVERLAY,
                 TensuraJadeConfig.RESPECT_ANALYSIS_GATING);
         check(registration.registeredIds().equals(expected),
                 "registered ids were " + registration.registeredIds() + " but expected " + expected);
+
+        // The shipped NPE: these two belong to Jade's tryAddConfig, not to this method.
+        for (ResourceLocation providerOwned : List.of(
+                TensuraJadeConfig.ENTITY_ANALYSIS, TensuraJadeConfig.BLOCK_ANALYSIS)) {
+            check(!registration.registeredIds().contains(providerOwned),
+                    providerOwned + " must be left to Jade's tryAddConfig; registering it here too "
+                            + "duplicates it and aborts the session with 'Duplicate config key'");
+        }
 
         for (RegistrationCall call : registration.calls()) {
             check(Boolean.TRUE.equals(call.value()),

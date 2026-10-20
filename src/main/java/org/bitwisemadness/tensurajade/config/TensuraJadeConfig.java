@@ -43,10 +43,30 @@ public final class TensuraJadeConfig {
     private TensuraJadeConfig() {
     }
 
-    /** Registers the toggles, grouped by their dotted paths under {@link #CATEGORY}. */
+    /**
+     * Registers the toggles this addon alone owns, grouped by their dotted paths under
+     * {@link #CATEGORY}.
+     *
+     * <p>{@link #ENTITY_ANALYSIS} and {@link #BLOCK_ANALYSIS} are deliberately <em>not</em>
+     * registered here, because Jade already creates them from the providers themselves.
+     * {@code WailaClientRegistration.registerEntityComponent/registerBlockComponent} call
+     * {@code tryAddConfig(provider)}, which registers {@code provider.getUid()} with
+     * {@code PluginConfig}. In a registration session that call is deferred - but
+     * {@code ClientRegistrationSession.end()} flips the session inactive <em>before</em>
+     * it flushes providers, so by the time {@link TensuraEntityProvider} and
+     * {@link TensuraBlockProvider} are installed their keys go straight into
+     * {@code PluginConfig}. The queued entries above are flushed <em>after</em> that pass,
+     * so naming those two keys here as well puts a second copy in front of
+     * {@code PluginConfig.addConfig}, which rejects it with
+     * {@code Duplicate config key} - aborting the flush and leaving every later toggle
+     * unregistered. That is exactly how {@link #RESPECT_ANALYSIS_GATING} came to be read
+     * on every analysis line without ever existing.</p>
+     *
+     * <p>Nothing is lost by leaving them out: {@code enabledByDefault()} is {@code true}
+     * and neither provider overrides it, so Jade still ships both toggles on, under this
+     * same {@link #CATEGORY}.</p>
+     */
     public static void register(IWailaClientRegistration registration) {
-        registration.addConfig(ENTITY_ANALYSIS, true);
-        registration.addConfig(BLOCK_ANALYSIS, true);
         registration.addConfig(SHOW_ABILITIES, true);
         registration.addConfig(HIDE_TENSURA_OVERLAY, true);
         registration.addConfig(RESPECT_ANALYSIS_GATING, true);

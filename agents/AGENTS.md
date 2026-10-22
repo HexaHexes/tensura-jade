@@ -87,6 +87,10 @@ Before starting any new development in this repo:
 - Push only after tests are green **and** the user has given the go.
 - Never sweep the user's uncommitted work into a commit — commit only what is intended.
 - Commit subjects: concise, imperative.
+- **Version bump on finish:** always bump the version when a new feature or bugfix
+  is finished.
+- **One feature or bugfix per branch:** develop each on its own feature branch and
+  merge it into main/master when finished.
 
 ## House style
 

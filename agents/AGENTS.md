@@ -90,7 +90,8 @@ Before starting any new development in this repo:
 - **Version bump on finish:** always bump the version when a new feature or bugfix
   is finished.
 - **One feature or bugfix per branch:** develop each on its own feature branch and
-  merge it into main/master when finished.
+  merge it into main/master through a pull request with a **squash merge**. The PR
+  body must detail the work done, following `.github/pull_request_template.md`.
 
 ## House style
 

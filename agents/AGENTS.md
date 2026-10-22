@@ -103,8 +103,14 @@ Before starting any new development in this repo:
 - **`mod_id`:** lowercase with underscores (`tensura_jade`). Minecraft requires
   `[a-z][a-z0-9_]{1,63}`.
 - **Jar / `archivesName`:** follows `mod_id` (`tensura_jade-<version>.jar`).
+- **Java base package:** `org.bitwisemadness.<project-name>` - repo name lowercased,
+  separators stripped (e.g. `ds-tensura-fix` -> `org.bitwisemadness.dstensurafix`).
+  The Maven `group` in `build.gradle` matches (`org.bitwisemadness`).
 - Keep repo name, folder name, `mod_id`, and the Java package aligned; the rename
   checklist in the template's `README.md` walks the whole set.
+- **The template (`neoforge-mod-template`) is canonical for org-wide rules.** When a
+  rule is added or changed in any repo's `agents/AGENTS.md`, mirror the change into
+  the template so new repos inherit it.
 
 ## CI & release model
 

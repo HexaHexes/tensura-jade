@@ -20,6 +20,7 @@ repositories {
         url = uri("https://cursemaven.com")
         content { includeGroup("curse.maven") }
     }
+    mavenCentral()
 }
 
 base {
@@ -89,37 +90,52 @@ neoForge {
 configurations {
     localRuntime
     runtimeClasspath.extendsFrom localRuntime
+    // Resolved manascore core artifact; its nested module jars are extracted
+    // into build/ for the compile classpath (see extractManascoreModules).
+    manascoreModules
 }
+
+// Compiled-against view of the extracted manascore module jars; the file
+// collection carries the task dependency, so javac always sees fresh output.
+def manascoreModuleJars = files(fileTree(dir: layout.buildDirectory.dir('manascore-modules').get().asFile, include: '**/*.jar'))
+manascoreModuleJars.builtBy 'extractManascoreModules'
 
 dependencies {
     // -------------------------------------------------------------------------
-    // Tensura, ManasCore and Jade: compile against the EXACT jars this pack runs,
-    // not against Maven coordinates, because the suppression mixin names Tensura's
-    // OverlayHandler methods directly - version drift there is the failure mode.
-    // All three stay optional at runtime: the addon no-ops if either is missing.
+    // Tensura, ManasCore and Jade: compile against the exact pack versions via
+    // pinned CurseMaven coordinates - version drift is the failure mode that
+    // matters. ManasCore's module jars nest inside the core artifact under
+    // META-INF/jars - extracted below for compilation, never committed. All
+    // three stay optional at runtime: the addon no-ops if either is missing.
     // -------------------------------------------------------------------------
-    compileOnly files(
-            'libs/tensura-neoforge-2.0.1.3.jar',
-            'libs/manascore-neoforge-4.0.0.2.jar',
-            'libs/manascore-race-neoforge-4.0.0.2.jar',
-            'libs/manascore-skill-neoforge-4.0.0.2.jar',
-            'libs/manascore-storage-neoforge-4.0.0.2.jar',
-            'libs/Jade-1.21.1-NeoForge-15.10.6.jar'
-    )
+    compileOnly 'curse.maven:tensura-reincarnated-643695:8793360' // tensura-neoforge-2.0.1.3
+    compileOnly 'curse.maven:manascore-619025:8022425' // manascore-neoforge-4.0.0.2 (core)
+    compileOnly manascoreModuleJars
+    compileOnly 'curse.maven:jade-324717:8591319' // Jade-1.21.1-NeoForge-15.10.6
 
-    // Run-time classpath for dev runs ONLY (runClient / runServer). Not published.
-    // ManasCore's main jar JiJ-embeds its sub-modules, which NeoForge extracts at
-    // runtime, so the main jar alone is what a dev run needs.
-    localRuntime files(
-            'libs/tensura-neoforge-2.0.1.3.jar',
-            'libs/manascore-neoforge-4.0.0.2.jar',
-            'libs/Jade-1.21.1-NeoForge-15.10.6.jar'
-    )
+    manascoreModules 'curse.maven:manascore-619025:8022425'
+
+    // Run-time classpath for dev runs ONLY (runClient / runServer /
+    // runGameTestServer). Not published. ManasCore's main jar JiJ-embeds its
+    // sub-modules, which NeoForge extracts at runtime, so the core jar alone
+    // is what a dev run needs.
+    localRuntime 'curse.maven:tensura-reincarnated-643695:8793360'
+    localRuntime 'curse.maven:manascore-619025:8022425'
+    localRuntime 'curse.maven:jade-324717:8591319'
     // Tensura's own required libraries (only needed for dev runs).
     localRuntime "curse.maven:architectury-api-419699:5786327"
     localRuntime "curse.maven:geckolib-388172:8309311"
     localRuntime "curse.maven:smartbrainlib-661293:7055149"
     localRuntime "curse.maven:terrablender-neoforge-940057:6054947"
+}
+
+// Extract manascore's nested module jars - byte-identical to the retired
+// libs/ copies - into build/ so javac sees the module APIs (StorageHolder and
+// friends). Derived entirely from the resolved Maven artifact.
+tasks.register('extractManascoreModules', Sync) {
+    from { zipTree(configurations.manascoreModules.singleFile) }
+    include 'META-INF/jars/*.jar'
+    into layout.buildDirectory.dir('manascore-modules')
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.
@@ -161,6 +177,18 @@ publishing {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+}
+
+// --- JUnit wiring (junit CI check) -------------------------------------------
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
 }
 
 // IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.

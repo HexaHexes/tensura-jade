@@ -19,8 +19,9 @@ read; Tensura's own floating overlay is hidden so nothing is shown twice.
 
 **Gotchas**
 - The suppression mixin names Tensura's `pre_renderAnalysis` / `renderAnalysis` and
-  resolves them **without a refmap** — compile against the exact Tensura jar you ship
-  with (`libs/`, pinned). Version drift there is the failure mode that matters.
+  resolves them **without a refmap** - compile against the exact pinned CurseMaven
+  coordinate of the Tensura jar you ship with. Version drift there is the failure
+  mode that matters; bump pins deliberately, never implicitly.
 - Client-only classes (Jade's `Screen`, Tensura's `RenderHelper`) must never load on a
   dedicated server. The number-shortening helper is **transcribed**, not called, for
   this reason; the config tests use a hand-written stub, not a `java.lang.reflect.Proxy`.
@@ -29,7 +30,8 @@ read; Tensura's own floating overlay is hidden so nothing is shown twice.
   `Duplicate config key` and aborts the flush, leaving later toggles unregistered (a
   real shipped crash). See the javadoc on that method.
 - `libs/` (six pinned jars: Tensura, ManasCore ×4, Jade) is **gitignored**. Never
-  commit them.
+  commit them. **All six now resolve as pinned CurseMaven coordinates** - see the
+  dependency rule in the build environment section; the folder is retired.
 
 ---
 
@@ -66,8 +68,8 @@ Before starting any new development in this repo:
 - JDK 21 (`JAVA_HOME` -> JDK 21); the toolchain targets Java 21.
 - The Gradle wrapper is committed. `./gradlew build` compiles,
   `./gradlew runGameTestServer` runs the GameTest server.
-- `libs/` (compile-only pinned jars) and `run/` are **gitignored**. Never commit
-  third-party jars.
+- `run/` is **gitignored**. Never commit third-party jars; dependencies resolve
+  through CurseMaven coordinates (see the gotchas above).
 - On `run/` file-lock errors, kill any stale `java` process and retry.
 
 ## PowerShell quirks (this org is developed on Windows)
@@ -122,10 +124,11 @@ Before starting any new development in this repo:
 - `ci.yml` currently enforces the **version-bump guard only**: a beta or stable bump must
   change the version file and nothing else; an `-alpha` bump may bundle work; a PR labelled
   `breaking` forces the next clean bump to raise the major or minor version.
-- **Build and GameTest jobs are deferred.** Six pinned `libs/` jars are not resolvable
-  from a clean checkout via CurseMaven alone, so compiling in CI would fail every run.
-  They land once a jar-fetch step exists. Until then, run `./gradlew build` and
-  `runGameTestServer` locally before pushing.
+- `ci.yml` runs three checks that back the branch protection rulesets: **junit**
+  (build + the JUnit suite, asserted non-vacuous), **gametest** (`runGameTestServer`,
+  graded on the `All N required tests passed` log line) and **version-bump** (a beta
+  or stable bump must change the version file and nothing else; an `-alpha` bump may
+  bundle work).
 - `version-bump.yml` opens an isolated version-bump PR (only the version file changes).
 - CurseForge publishing (`curseforge.yml`) is **deferred** until the mod has a CurseForge
   listing and the `CURSEFORGE_PROJECT_ID` / `CURSEFORGE_API_KEY` secrets. Do not add it

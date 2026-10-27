@@ -162,18 +162,42 @@ sourceSets.main.resources.srcDir generateModMetadata
 // To avoid having to run "generateModMetadata" manually, make it run on every project reload
 neoForge.ideSyncTask generateModMetadata
 
+// --- Publishing -------------------------------------------------------------
+
+// Every repo in the org publishes its artifact to the org's GitHub Packages
+// Maven registry for alpha, beta and stable releases (see agents/AGENTS.md):
+// release.yml cuts the GitHub release, publish.yml runs on "release published"
+// and drives this block. Credentials come from the workflow token in CI; a
+// local publish can supply gpr.user / gpr.key in ~/.gradle/gradle.properties.
+// Keep the URL pointing at THIS repository - the rename checklist covers it.
 publishing {
     publications {
         register('mavenJava', MavenPublication) {
             from components.java
+            artifactId = mod_id
+            pom {
+                name = mod_name
+                description = mod_description
+                licenses {
+                    license {
+                        name = mod_license
+                    }
+                }
+            }
         }
     }
     repositories {
         maven {
-            url "file://${project.projectDir}/repo"
+            name = 'GitHubPackages'
+            url = uri('https://maven.pkg.github.com/HexaHexes/tensura-jade')
+            credentials {
+                username = System.getenv('GITHUB_ACTOR') ?: project.findProperty('gpr.user')
+                password = System.getenv('GITHUB_TOKEN') ?: project.findProperty('gpr.key')
+            }
         }
     }
 }
+
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation

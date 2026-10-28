@@ -56,3 +56,12 @@ read; Tensura's own floating overlay is hidden so nothing is shown twice.
 - Repo and folder: `tensura-jade`; `mod_id`: `tensura_jade`; Java base package
   `org.bitwisemadness.tensurajade`, with the Maven `group` in `build.gradle`
   matching.
+
+## CI & release model - this repo
+
+- `ci.yml` runs the template's three checks (junit, gametest, version-bump).
+- `release.yml` cuts the GitHub release for `v<mod_version>` on a push to `main`
+  (pre-releases only when the repo variable `ALPHA_RELEASES` is true), and
+  `publish.yml` publishes the Maven artifact to the org's GitHub Packages
+  registry when that release is published - see the org rulebook for the
+  consumer-side auth details (`PACKAGE_READ_TOKEN`).

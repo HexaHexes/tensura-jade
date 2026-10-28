@@ -81,6 +81,11 @@ jobs:
 
       - name: Build the jar
         if: steps.resolve.outputs.skip == 'false'
+        env:
+          # Step-scoped read token for the mob_info_common dependency: the
+          # workflow's own token cannot read a package owned by another
+          # repository (see the note in ci.yml's junit job).
+          PACKAGE_READ_TOKEN: ${{ secrets.PACKAGE_READ_TOKEN }}
         run: ./gradlew build --no-daemon --stacktrace
 
       - name: Publish the release

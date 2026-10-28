@@ -15,6 +15,10 @@ thing a second time — stays hidden while this addon is doing that.
   HP, SHP, armor, aura, magicule, EP, and every ability the target has actually learned.
   Abilities are listed one per line rather than cycling one at a time, so you can read
   them all at once.
+- **Mob names show their variant.** A mob that has one is titled the way it actually
+  reads — *Red Fang Direwolf*, *Emerald Fire Dragon* — instead of the plain species name.
+  Works for Tensura, Ice and Fire, Mobs of Mythology and Mysticism mobs. This line needs
+  the addon installed on the server too; without it, names stay vanilla.
 - **Blocks show Tensura's analysis.** Hardness (negative reads as *Unbreakable*), blast
   resistance, light, whether the correct tool is equipped, crop/vine age, redstone
   strength, and EP for the Charybdis core.
@@ -43,6 +47,7 @@ right next to the tooltip it controls:
 | Entity analysis | On | Add Tensura's stats to mob tooltips |
 | Block analysis | On | Add Tensura's analysis to block tooltips |
 | Show abilities | On | Include the target's ability list |
+| Variant titles | On | Show mob variants in the entity name |
 | Hide Tensura overlay | On | Suppress Tensura's floating panel |
 | Respect analysis gating | On | Honour Tensura's analysis rules |
 
@@ -51,13 +56,14 @@ handy for testing or screenshots, but a balance choice to leave to your server.
 
 ## Dependencies
 
-The mod loads and does nothing without these — install all three:
+The mod loads and does nothing without these — install all four:
 
 | | Mod | Why |
 |---|---|---|
 | Required | [Tensura: Reincarnated](https://www.curseforge.com/minecraft/mc-mods/tensura-reincarnated) | The analysis content being shown |
 | Required | [Jade](https://www.curseforge.com/minecraft/mc-mods/jade) | The tooltip it appears in |
 | Required | [ManasCore](https://www.curseforge.com/minecraft/mc-mods/manascore) | Tensura's core library |
+| Required | Mob Info Common | Shared variant-name and analysis-gating logic (ships with this addon's packs) |
 
 Made for the **Tensura RPG** pack (Minecraft 1.21.1, NeoForge).
 

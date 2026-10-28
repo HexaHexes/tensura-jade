@@ -74,3 +74,13 @@ no analysis to show without Tensura.
     type="optional"
     ordering="AFTER"
     side="BOTH"
+
+# Mob Info Common - required. The shared variant-name and analysis-gating library:
+# the Race/variant qualification reads its variant logic, and the analysis panel
+# delegates its gating rules to it. Ships as its own mod in the pack.
+[[dependencies.tensura_jade]]
+    modId="mob_info_common"
+    type="required"
+    versionRange="[${mob_info_common_version},)"
+    ordering="AFTER"
+    side="BOTH"

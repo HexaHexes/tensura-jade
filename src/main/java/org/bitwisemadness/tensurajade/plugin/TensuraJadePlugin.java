@@ -6,7 +6,9 @@ import org.bitwisemadness.tensurajade.TensuraJade;
 import org.bitwisemadness.tensurajade.config.TensuraJadeConfig;
 import org.bitwisemadness.tensurajade.provider.TensuraBlockProvider;
 import org.bitwisemadness.tensurajade.provider.TensuraEntityProvider;
+import org.bitwisemadness.tensurajade.provider.VariantRelay;
 import snownee.jade.api.IWailaClientRegistration;
+import snownee.jade.api.IWailaCommonRegistration;
 import snownee.jade.api.IWailaPlugin;
 import snownee.jade.api.WailaPlugin;
 
@@ -20,6 +22,20 @@ import snownee.jade.api.WailaPlugin;
  */
 @WailaPlugin(TensuraJade.MOD_ID)
 public final class TensuraJadePlugin implements IWailaPlugin {
+
+    /**
+     * The server-side half of the addon: the variant relay that feeds
+     * {@code VariantRelay}'s data to the client-side title mixin.
+     *
+     * <p>Registered here rather than client-side because it runs where the
+     * entity actually is - the server - and Jade syncs what it writes into the
+     * same serverData compound the client providers read. On a server without
+     * this addon the channel is simply empty and the title stays vanilla.</p>
+     */
+    @Override
+    public void register(IWailaCommonRegistration registration) {
+        registration.registerEntityDataProvider(new VariantRelay(), LivingEntity.class);
+    }
 
     @Override
     public void registerClient(IWailaClientRegistration registration) {

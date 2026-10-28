@@ -65,7 +65,8 @@ public final class ConfigGameTests {
         Set<ResourceLocation> expected = Set.of(
                 TensuraJadeConfig.SHOW_ABILITIES,
                 TensuraJadeConfig.HIDE_TENSURA_OVERLAY,
-                TensuraJadeConfig.RESPECT_ANALYSIS_GATING);
+                TensuraJadeConfig.RESPECT_ANALYSIS_GATING,
+                TensuraJadeConfig.VARIANT_TITLES);
         check(registration.registeredIds().equals(expected),
                 "registered ids were " + registration.registeredIds() + " but expected " + expected);
 

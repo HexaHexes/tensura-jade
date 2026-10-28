@@ -19,9 +19,10 @@ read; Tensura's own floating overlay is hidden so nothing is shown twice.
   by `TensuraJadeMixinPlugin`, so it never applies unless both are present.
 - ManasCore is present whenever Tensura is; it provides the storage APIs.
 
-**Test:** `./gradlew runGameTestServer` — `AnalysisGameTests` + `ConfigGameTests`
-(**18** tests). No `expectedTests` guard in `build.gradle`; verify from the log line
-`All 18 required tests passed :)`.
+**Test:** `./gradlew runGameTestServer` - `AnalysisGameTests` + `ConfigGameTests` +
+`VariantRelayGameTests`
+(**20** tests). No `expectedTests` guard in `build.gradle`; verify from the log line
+`All 20 required tests passed :)`.
 
 **Remote:** `github.com/HexaHexes/tensura-jade` (public, default branch `main`).
 

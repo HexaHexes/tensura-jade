@@ -11,13 +11,11 @@ import io.github.manasmods.manascore.skill.impl.SkillStorage;
 import io.github.manasmods.tensura.block.HipokuteGrass;
 import io.github.manasmods.tensura.block.entity.CharybdisCoreBlockEntity;
 import io.github.manasmods.tensura.entity.template.subclass.ILivingPartEntity;
-import io.github.manasmods.tensura.registry.attribute.TensuraAttributes;
 import io.github.manasmods.tensura.storage.Alignment;
 import io.github.manasmods.tensura.storage.TensuraStorages;
 import io.github.manasmods.tensura.storage.ability.AbilitySlot;
 import io.github.manasmods.tensura.storage.ability.IAbility;
 import io.github.manasmods.tensura.storage.ep.IExistence;
-import io.github.manasmods.tensura.storage.player.ITensuraPlayer;
 import io.github.manasmods.tensura.util.EnergyHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -30,13 +28,13 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
+import org.bitwisemadness.mobinfocommon.analysis.AnalysisGating;
 import org.bitwisemadness.tensurajade.config.TensuraJadeConfig;
 import snownee.jade.api.BlockAccessor;
 import snownee.jade.api.EntityAccessor;
 import snownee.jade.api.ITooltip;
 import snownee.jade.api.config.IPluginConfig;
 
-import java.text.DecimalFormat;
 import java.util.List;
 import java.util.Optional;
 
@@ -56,6 +54,11 @@ import java.util.Optional;
  * loadable; and the panel is verified by headless game tests, which run on a dedicated
  * server where loading a client class aborts. Callers gate on
  * {@code ModList.isLoaded("tensura")} before touching this class at all.</p>
+ *
+ * <p><strong>The gating rules and the number shortening are no longer this class's
+ * own.</strong> They moved into the shared {@code mob_info_common} library so
+ * Pseudocore's horn tooltip gates and blurs by the same source; what remains here
+ * is the thin wiring from this addon's plugin config into that library.</p>
  */
 public final class TensuraAnalysis {
 
@@ -173,18 +176,14 @@ public final class TensuraAnalysis {
     /**
      * Maximum EP - except while gating, where Tensura blurs anything beyond the viewer's
      * grasp into {@code "12k+"} so analysis cannot be used to measure the unmeasurable.
+     *
+     * <p>The blur itself now lives in the shared library
+     * ({@code mob_info_common}'s {@code AnalysisGating}), so this panel and Pseudocore's
+     * horn tooltip blur EP by the same recipe from the same source.</p>
      */
     private static Component epValue(Player viewer, LivingEntity entity, IPluginConfig config) {
-        double maxEp = EnergyHelper.getMaxEP(entity);
-        if (!config.get(TensuraJadeConfig.RESPECT_ANALYSIS_GATING)) {
-            return shortenedNumber(maxEp);
-        }
-
-        double reach = EnergyHelper.getMaxEP(viewer) * (1.0 + (double) analysisLevel(viewer) * 0.5);
-        if (maxEp > reach) {
-            return concat(shortenedNumber(reach), Component.literal("+"));
-        }
-        return shortenedNumber(maxEp);
+        return AnalysisGating.epReadout(viewer, EnergyHelper.getMaxEP(entity),
+                config.get(TensuraJadeConfig.RESPECT_ANALYSIS_GATING));
     }
 
     /**
@@ -350,66 +349,25 @@ public final class TensuraAnalysis {
     /**
      * Whether the viewer is entitled to entity analysis at all.
      *
-     * <p>Tensura gates its overlay on the {@code analysis_level} and
-     * {@code analysis_distance} attributes both being positive, then on the analysis
-     * mode: {@code 0} analyses whatever is aimed at (mobs win over blocks), {@code 1}
-     * mobs only, {@code 2} blocks only. Missing player data means no analysis.</p>
-     *
-     * <p><strong>The reach limit is deliberately not mirrored.</strong> Tensura picks its
-     * target with {@code getTargetingEntity(player, analysisDistance, ...)} and its block
-     * with a raycast of the same length, so its own HUD stops dead at
-     * {@code analysis_distance} - 5 blocks by default, with the attribute topping out at
-     * 1024. Jade does not stop there: it validates entity data out to
-     * {@code entityInteractionRange() + 21}, roughly 24. Comparing distances here would
-     * leave a band in which Jade's own rows - name, health, effects, NBT - stay on screen
-     * while ours vanish, and a tooltip that half-disappears is worse than analysis
-     * reaching a little further than the HUD would. The attribute is still consulted:
-     * {@code analysis_distance <= 0} is Tensura's own statement that this viewer has no
-     * analysis to spend, and that is kept.</p>
+     * <p>The rules are Tensura's own {@code pre_renderAnalysis} conditions, minus the
+     * reach limit - both now live in the shared library
+     * ({@code mob_info_common}'s {@code AnalysisGating}), so this panel and
+     * Pseudocore gate by the same source. The library's javadoc carries the full
+     * rationale, including why the distance the target sits at plays no part.</p>
      *
      * <p>Which makes the parameter list a statement rather than an omission: the answer
      * depends only on the viewer, never on what is being looked at.</p>
      */
     public static boolean allowedForEntity(Player viewer, IPluginConfig config) {
-        if (!config.get(TensuraJadeConfig.RESPECT_ANALYSIS_GATING)) {
-            return true;
-        }
-        if (analysisLevel(viewer) <= 0 || analysisDistance(viewer) <= 0) {
-            return false;
-        }
-        int mode = analysisMode(viewer);
-        return mode == 0 || mode == 1;
+        return AnalysisGating.allowedForEntity(viewer, config.get(TensuraJadeConfig.RESPECT_ANALYSIS_GATING));
     }
 
     /**
      * As {@link #allowedForEntity}, for blocks: analysis mode {@code 0} or {@code 2},
-     * never {@code 1}. The reach limit is dropped here for the same reason, and it is just
-     * as visible - Jade keeps reporting a block long past the raycast Tensura would have
-     * cast at it.
+     * never {@code 1}.
      */
     public static boolean allowedForBlock(Player viewer, IPluginConfig config) {
-        if (!config.get(TensuraJadeConfig.RESPECT_ANALYSIS_GATING)) {
-            return true;
-        }
-        if (analysisLevel(viewer) <= 0 || analysisDistance(viewer) <= 0) {
-            return false;
-        }
-        int mode = analysisMode(viewer);
-        return mode == 0 || mode == 2;
-    }
-
-    private static int analysisLevel(Player viewer) {
-        return (int) viewer.getAttributeValue(TensuraAttributes.ANALYSIS_LEVEL);
-    }
-
-    private static int analysisDistance(Player viewer) {
-        return (int) viewer.getAttributeValue(TensuraAttributes.ANALYSIS_DISTANCE);
-    }
-
-    /** Returns {@code -1} when the viewer has no Tensura player data, which never analyses. */
-    private static int analysisMode(Player viewer) {
-        ITensuraPlayer data = TensuraStorages.getPlayerDataFrom(viewer);
-        return data == null ? -1 : data.getAnalysisMode();
+        return AnalysisGating.allowedForBlock(viewer, config.get(TensuraJadeConfig.RESPECT_ANALYSIS_GATING));
     }
 
     // ---------------------------------------------------------------------
@@ -421,40 +379,12 @@ public final class TensuraAnalysis {
     }
 
     /**
-     * The number shortening Tensura's overlay prints, reproduced rather than reused.
-     *
-     * <p>Tensura keeps this as {@code RenderHelper.getShortenedNumber}, a static method
-     * inside a client-rendering utility whose neighbours take {@code GuiGraphics} and
-     * {@code MultiBufferSource}. Loading <em>that</em> class on a dedicated server aborts
-     * with {@code invalid dist DEDICATED_SERVER}, because verification resolves those
-     * parameter types even for a pure method. This panel is therefore transcribed here
-     * byte-for-byte from Tensura's implementation - the same two thresholds, the same
-     * {@code DecimalFormat} patterns, and Tensura's own {@code million_index} /
-     * {@code billion_index} keys - so values read identically while staying loadable on
-     * both sides.</p>
-     *
-     * <p>Anything below a million prints as a bare integer, as {@code "14000"}; a million
-     * or more becomes {@code "1.4M"}-style through Tensura's translation keys, so the
-     * wording still comes from Tensura's language file rather than from here.</p>
+     * The number shortening Tensura's overlay prints. The transcription itself
+     * now lives in the shared library ({@code mob_info_common}'s
+     * {@code AnalysisGating}), so both consumers shorten by the same recipe;
+     * this delegate keeps the panel's call sites short.
      */
     private static Component shortenedNumber(double value) {
-        if (value < 1_000_000.0D) {
-            return Component.literal(new DecimalFormat("#").format(value));
-        }
-        DecimalFormat scaled = new DecimalFormat("#.##");
-        if (value < 1_000_000_000.0D) {
-            return Component.translatable("tensura.main_menu.million_index",
-                    scaled.format(value / 1_000_000.0D));
-        }
-        return Component.translatable("tensura.main_menu.billion_index",
-                scaled.format(value / 1_000_000_000.0D));
-    }
-
-    private static MutableComponent concat(Component... parts) {
-        MutableComponent out = Component.empty();
-        for (Component part : parts) {
-            out.append(part);
-        }
-        return out;
+        return AnalysisGating.shortenedNumber(value);
     }
 }

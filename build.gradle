@@ -21,6 +21,21 @@ repositories {
         content { includeGroup("curse.maven") }
     }
     mavenCentral()
+
+    // mob-info-common, from the org's GitHub Packages registry. Reads always
+    // require auth, and GitHub answers 404 (not 401) when it is missing, so an
+    // unauthenticated build fails with a message that looks like a mistyped
+    // coordinate. CI injects the PACKAGE_READ_TOKEN secret as GITHUB_TOKEN on
+    // the Gradle steps only; locally supply gpr.user / gpr.key in
+    // ~/.gradle/gradle.properties.
+    maven {
+        name = 'GitHubPackages'
+        url = uri('https://maven.pkg.github.com/HexaHexes/mob-info-common')
+        credentials {
+            username = System.getenv('GITHUB_ACTOR') ?: project.findProperty('gpr.user')
+            password = System.getenv('GITHUB_TOKEN') ?: project.findProperty('gpr.key')
+        }
+    }
 }
 
 base {
@@ -112,6 +127,18 @@ dependencies {
     compileOnly 'curse.maven:manascore-619025:8022425' // manascore-neoforge-4.0.0.2 (core)
     compileOnly manascoreModuleJars
     compileOnly 'curse.maven:jade-324717:8591319' // Jade-1.21.1-NeoForge-15.10.6
+    // GeckoLib + SmartBrainLib: the variant-relay game tests spawn a direwolf,
+    // whose hierarchy implements their interfaces, so javac needs those types
+    // even though no geckolib/smartbrainlib call is made. compileOnly keeps
+    // them off the published POM; both are already on the dev-run classpath.
+    compileOnly 'curse.maven:geckolib-388172:8309311'
+    compileOnly 'curse.maven:smartbrainlib-661293:7055149'
+
+    // mob-info-common: the shared variant-name and analysis-gating logic, a
+    // required mod (see neoforge.mods.toml) resolved from the org's GitHub
+    // Packages registry. Never packaged - the library ships as its own mod.
+    compileOnly "org.bitwisemadness.mobinfocommon:mob_info_common:${mob_info_common_version}"
+    runtimeOnly "org.bitwisemadness.mobinfocommon:mob_info_common:${mob_info_common_version}"
 
     manascoreModules 'curse.maven:manascore-619025:8022425'
 
@@ -150,6 +177,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             mod_name               : mod_name,
             mod_license            : mod_license,
             mod_version            : mod_version,
+            mob_info_common_version: mob_info_common_version,
     ]
     inputs.properties replaceProperties
     expand replaceProperties

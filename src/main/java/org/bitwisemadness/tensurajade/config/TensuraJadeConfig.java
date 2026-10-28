@@ -27,6 +27,14 @@ public final class TensuraJadeConfig {
     public static final ResourceLocation SHOW_ABILITIES = key("tensura_jade.show_abilities");
 
     /**
+     * Qualify Jade's entity title with the target's variant - "Red Fang
+     * Direwolf" - the way the Pseudocore's Race line reads. The variant
+     * arrives through the addon's own server relay; without it (or without a
+     * readable variant) the vanilla title stands.
+     */
+    public static final ResourceLocation VARIANT_TITLES = key("tensura_jade.variant_titles");
+
+    /**
      * Suppress Tensura's own floating analysis overlay, so the same information is not
      * shown twice. Only ever honoured while Jade is installed - the mixin config
      * requires both mods.
@@ -70,6 +78,7 @@ public final class TensuraJadeConfig {
         registration.addConfig(SHOW_ABILITIES, true);
         registration.addConfig(HIDE_TENSURA_OVERLAY, true);
         registration.addConfig(RESPECT_ANALYSIS_GATING, true);
+        registration.addConfig(VARIANT_TITLES, true);
     }
 
     private static ResourceLocation key(String path) {

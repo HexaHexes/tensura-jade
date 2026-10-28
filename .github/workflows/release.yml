@@ -25,6 +25,9 @@ on:
 
 permissions:
   contents: write
+  # Dispatching the publishing workflows below needs actions: write - an
+  # explicit permissions block zeroes every scope it does not name.
+  actions: write
 
 concurrency:
   group: release
@@ -113,3 +116,30 @@ jobs:
             --title "v$VERSION" \
             --notes "$NOTES" \
             $PRERELEASE
+      # GitHub refuses to cascade workflow runs started by the default
+      # GITHUB_TOKEN, so the "release: published" trigger only ever fires for
+      # releases created by hand. Dispatch the publishing workflows directly
+      # instead - they are deliberately separate from this one, so a Modrinth
+      # or Packages outage never fails the release itself. Workflows that are
+      # not present in a repo are skipped, so this file needs no edit when a
+      # repo has not adopted one of them yet.
+      - name: Dispatch the publishing workflows
+        if: steps.resolve.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          if [ -f .github/workflows/publish.yml ]; then
+            gh workflow run publish.yml
+            echo "Dispatched publish.yml."
+          fi
+          if [ -f .github/workflows/modrinth.yml ]; then
+            gh workflow run modrinth.yml -f tag="v$VERSION"
+            echo "Dispatched modrinth.yml for v$VERSION."
+          fi
+          if [ -f .github/workflows/curseforge.yml ]; then
+            gh workflow run curseforge.yml -f tag="v$VERSION"
+            echo "Dispatched curseforge.yml for v$VERSION."
+          fi

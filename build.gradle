@@ -25,15 +25,16 @@ repositories {
     // mob-info-common, from the org's GitHub Packages registry. Reads always
     // require auth, and GitHub answers 404 (not 401) when it is missing, so an
     // unauthenticated build fails with a message that looks like a mistyped
-    // coordinate. CI injects the PACKAGE_READ_TOKEN secret as GITHUB_TOKEN on
-    // the Gradle steps only; locally supply gpr.user / gpr.key in
-    // ~/.gradle/gradle.properties.
+    // coordinate. CI injects PACKAGE_READ_TOKEN (a read:packages token - the
+    // workflow GITHUB_TOKEN cannot read a package owned by another repo, and
+    // publish.yml needs its own GITHUB_TOKEN for the write side); locally
+    // supply gpr.user / gpr.key in ~/.gradle/gradle.properties.
     maven {
         name = 'GitHubPackages'
         url = uri('https://maven.pkg.github.com/HexaHexes/mob-info-common')
         credentials {
             username = System.getenv('GITHUB_ACTOR') ?: project.findProperty('gpr.user')
-            password = System.getenv('GITHUB_TOKEN') ?: project.findProperty('gpr.key')
+            password = System.getenv('PACKAGE_READ_TOKEN') ?: System.getenv('GITHUB_TOKEN') ?: project.findProperty('gpr.key')
         }
     }
 }

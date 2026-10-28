@@ -44,6 +44,12 @@ jobs:
 
       - name: Publish to GitHub Packages
         env:
+          # GITHUB_TOKEN (the workflow's own, packages: write) uploads THIS
+          # repo's artifact; PACKAGE_READ_TOKEN reads the mob_info_common
+          # dependency the compile step needs - one token cannot do both,
+          # since a read token for another repo's package and the write for
+          # this one live in different grants.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE_READ_TOKEN: ${{ secrets.PACKAGE_READ_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
         run: ./gradlew publish --no-daemon --stacktrace

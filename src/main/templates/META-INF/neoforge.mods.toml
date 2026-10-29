@@ -25,6 +25,11 @@ no analysis to show without Tensura.
 # Suppresses Tensura's floating analysis overlay so it is not shown alongside Jade's
 # copy of the same information. Only loaded when BOTH mods are present, so the
 # addon can never hide the overlay without putting it back into a tooltip.
+[modproperties.${mod_id}]
+# Optional: background texture for this mod's Configured config screen (see the
+# In-game config editing section of README.md). Any existing texture works.
+configuredBackground = "minecraft:textures/block/stone.png"
+
 [[mixins]]
     config="tensura_jade.mixins.json"
     requiredMods=["tensura", "jade"]

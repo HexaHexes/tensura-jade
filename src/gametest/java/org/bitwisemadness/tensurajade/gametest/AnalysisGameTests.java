@@ -291,7 +291,8 @@ public final class AnalysisGameTests {
         check(panel.size() == 8,
                 "expected race + alignment + six stats, got " + panel.texts());
 
-        Component expectedName = races.getRace().get().getRace().getName();
+        Component expectedName = java.util.Objects.requireNonNull(
+                races.getRace().get().getRace().getName(), "race name must resolve for comparison");
         Component raceLine = panel.line(0);
         check(raceLine.getString().equals(expectedName.getString()),
                 "line 0 was <" + raceLine.getString() + "> but the race name is <"

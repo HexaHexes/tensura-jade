@@ -1,7 +1,11 @@
 package org.bitwisemadness.tensurajade.gametest;
 
+import static org.bitwisemadness.tensurajade.gametest.TestSupport.check;
+import static org.bitwisemadness.tensurajade.gametest.TestSupport.entityAccessor;
+
 import io.github.manasmods.tensura.entity.monster.DirewolfEntity;
 import io.github.manasmods.tensura.entity.variant.DirewolfVariant;
+import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
@@ -19,11 +23,6 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.bitwisemadness.mobinfocommon.variant.VariantHelper;
 import org.bitwisemadness.tensurajade.TensuraJade;
 import org.bitwisemadness.tensurajade.provider.VariantRelay;
-
-import java.util.Optional;
-
-import static org.bitwisemadness.tensurajade.gametest.TestSupport.check;
-import static org.bitwisemadness.tensurajade.gametest.TestSupport.entityAccessor;
 
 /**
  * Proves the server half of the variant-qualified title (issue #3): the relay

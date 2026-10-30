@@ -1,5 +1,11 @@
 package org.bitwisemadness.tensurajade.gametest;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -29,13 +35,6 @@ import snownee.jade.api.view.FluidView;
 import snownee.jade.api.view.IClientExtensionProvider;
 import snownee.jade.api.view.ItemView;
 import snownee.jade.api.view.ProgressView;
-
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 /**
  * A hand-written stand-in for Jade's client registration, used by the config game tests.

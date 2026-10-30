@@ -1,5 +1,9 @@
 package org.bitwisemadness.tensurajade.gametest;
 
+import static org.bitwisemadness.tensurajade.gametest.TestSupport.check;
+
+import java.util.List;
+import java.util.Set;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
@@ -11,11 +15,6 @@ import org.bitwisemadness.tensurajade.gametest.JadeClientRegistrationStub.Regist
 import org.bitwisemadness.tensurajade.provider.TensuraBlockProvider;
 import org.bitwisemadness.tensurajade.provider.TensuraEntityProvider;
 import snownee.jade.impl.config.PluginConfig;
-
-import java.util.List;
-import java.util.Set;
-
-import static org.bitwisemadness.tensurajade.gametest.TestSupport.check;
 
 /**
  * Covers the addon's configuration contract with Jade.

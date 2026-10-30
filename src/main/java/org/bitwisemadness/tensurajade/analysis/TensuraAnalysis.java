@@ -17,6 +17,8 @@ import io.github.manasmods.tensura.storage.ability.AbilitySlot;
 import io.github.manasmods.tensura.storage.ability.IAbility;
 import io.github.manasmods.tensura.storage.ep.IExistence;
 import io.github.manasmods.tensura.util.EnergyHelper;
+import java.util.List;
+import java.util.Optional;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.TextColor;
@@ -34,9 +36,6 @@ import snownee.jade.api.BlockAccessor;
 import snownee.jade.api.EntityAccessor;
 import snownee.jade.api.ITooltip;
 import snownee.jade.api.config.IPluginConfig;
-
-import java.util.List;
-import java.util.Optional;
 
 /**
  * Reproduces the content of Tensura's analysis overlay as Jade tooltip lines.
@@ -265,7 +264,8 @@ public final class TensuraAnalysis {
         if (state == null || state.isAir()) {
             return;
         }
-        if (!(accessor.getPlayer() instanceof Player viewer)) {
+        Player viewer = accessor.getPlayer();
+        if (viewer == null) {
             return;
         }
         if (!allowedForBlock(viewer, config)) {

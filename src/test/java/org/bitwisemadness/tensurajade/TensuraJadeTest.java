@@ -1,8 +1,8 @@
 package org.bitwisemadness.tensurajade;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
 
 /**
  * Keeps the junit CI check non-vacuous: the suite must always assert something

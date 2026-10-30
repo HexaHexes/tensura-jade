@@ -1,5 +1,17 @@
 package org.bitwisemadness.tensurajade.gametest;
 
+import static org.bitwisemadness.tensurajade.gametest.TestSupport.TooltipRecorder;
+import static org.bitwisemadness.tensurajade.gametest.TestSupport.blockAccessor;
+import static org.bitwisemadness.tensurajade.gametest.TestSupport.check;
+import static org.bitwisemadness.tensurajade.gametest.TestSupport.config;
+import static org.bitwisemadness.tensurajade.gametest.TestSupport.entityAccessor;
+import static org.bitwisemadness.tensurajade.gametest.TestSupport.expectLabel;
+import static org.bitwisemadness.tensurajade.gametest.TestSupport.expectStat;
+import static org.bitwisemadness.tensurajade.gametest.TestSupport.indexOfLabel;
+import static org.bitwisemadness.tensurajade.gametest.TestSupport.labelKeys;
+import static org.bitwisemadness.tensurajade.gametest.TestSupport.setAttribute;
+import static org.bitwisemadness.tensurajade.gametest.TestSupport.values;
+
 import io.github.manasmods.manascore.race.api.RaceAPI;
 import io.github.manasmods.manascore.race.api.Races;
 import io.github.manasmods.manascore.skill.api.ManasSkillInstance;
@@ -15,6 +27,7 @@ import io.github.manasmods.tensura.storage.ability.AbilitySlot;
 import io.github.manasmods.tensura.storage.ability.IAbility;
 import io.github.manasmods.tensura.storage.ep.IExistence;
 import io.github.manasmods.tensura.storage.player.ITensuraPlayer;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
@@ -43,20 +56,6 @@ import org.bitwisemadness.tensurajade.TensuraJade;
 import org.bitwisemadness.tensurajade.analysis.TensuraAnalysis;
 import org.bitwisemadness.tensurajade.config.TensuraJadeConfig;
 import snownee.jade.api.config.IPluginConfig;
-
-import java.util.List;
-
-import static org.bitwisemadness.tensurajade.gametest.TestSupport.TooltipRecorder;
-import static org.bitwisemadness.tensurajade.gametest.TestSupport.blockAccessor;
-import static org.bitwisemadness.tensurajade.gametest.TestSupport.check;
-import static org.bitwisemadness.tensurajade.gametest.TestSupport.config;
-import static org.bitwisemadness.tensurajade.gametest.TestSupport.entityAccessor;
-import static org.bitwisemadness.tensurajade.gametest.TestSupport.expectLabel;
-import static org.bitwisemadness.tensurajade.gametest.TestSupport.expectStat;
-import static org.bitwisemadness.tensurajade.gametest.TestSupport.indexOfLabel;
-import static org.bitwisemadness.tensurajade.gametest.TestSupport.labelKeys;
-import static org.bitwisemadness.tensurajade.gametest.TestSupport.setAttribute;
-import static org.bitwisemadness.tensurajade.gametest.TestSupport.values;
 
 /**
  * Exercises the analysis panel itself: the gating rules it mirrors, and the lines it

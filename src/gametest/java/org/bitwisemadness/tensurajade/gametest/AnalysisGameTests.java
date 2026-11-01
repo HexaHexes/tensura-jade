@@ -224,10 +224,9 @@ public final class AnalysisGameTests {
         existence.setMagicule(4321.0D);
         existence.setAlignment(Alignment.MAJIN);
 
-        // A freshly spawned mob's health is Tensura's business, not this panel's, so the
-        // input is pinned rather than assumed. A fraction does double duty: it proves the
-        // line reports *current* health - not the maximum - and that it rounds up as
-        // Tensura's does, rather than truncating.
+        // A freshly spawned mob's health is Tensura's business, not this panel's, so the input is
+        // pinned rather than assumed. A fraction proves the line reports *current* health - not the
+        // maximum - and that it rounds up as Tensura's does rather than truncating.
         target.setHealth(4.5F);
 
         IPluginConfig toggles = config(values(

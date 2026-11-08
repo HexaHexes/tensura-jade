@@ -4,18 +4,19 @@ Tensura Jade puts Tensura: Reincarnated's analysis window inside Jade's look-up
 tooltip, so the information you already read for every block and mob now includes
 Tensura's stats. One tooltip, drawn once, instead of a second floating panel.
 
-Aim at a mob and its race, alignment, HP, SHP, armor, aura, magicule, EP and
-abilities appear in the Jade tooltip. Aim at a block and its hardness,
+Aim at a mob and its race, alignment, spiritual health, armor, aura, magicule,
+EP and abilities appear in the Jade tooltip. Aim at a block and its hardness,
 resistance, light, harvest check, age and EP appear the same way. Tensura's own
 overlay, which was showing all of that a second time, stays hidden while this
 addon is doing the work.
 
 ## What it does
 
-- **Entities show Tensura's stats.** Race (in the target's alignment colour),
-  alignment, HP, SHP, armor, aura, magicule, EP, and every ability the target has
-  actually learned. Abilities are listed one per line instead of cycling one at a
-  time, so you can read them all at once.
+- **Entities show Tensura's stats.** Spiritual health sits directly under Jade's
+  own health bar, then the race (in the target's alignment colour), alignment,
+  armor, aura, magicule, EP, and every ability the target has actually learned.
+  Abilities are listed one per line instead of cycling one at a time, so you can
+  read them all at once.
 - **Mob names show their variant.** A mob that has one is titled the way it
   actually reads, *Red Fang Direwolf* or *Emerald Fire Dragon*, rather than the
   plain species name. This covers Tensura, Ice and Fire, Mobs of Mythology and

@@ -22,7 +22,6 @@ import java.util.Optional;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.TextColor;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -62,7 +61,6 @@ import snownee.jade.api.config.IPluginConfig;
 public final class TensuraAnalysis {
 
     // --- Entity line labels: Tensura's own keys, so they read and localise identically.
-    private static final String LABEL_HP = "tensura.vanilla_attribute.health.shortened_name";
     private static final String LABEL_SHP = "tensura.attribute.spiritual_health.shortened_name";
     private static final String LABEL_ARMOR = "attribute.name.generic.armor";
     private static final String LABEL_AURA = "tensura.attribute.aura.shortened_name";
@@ -128,14 +126,16 @@ public final class TensuraAnalysis {
         Alignment alignment = existence.getAlignment();
         int alignmentColour = alignment == null ? 0xFFFFFF : alignment.getColor() & 0xFFFFFF;
 
+        // SHP leads the panel so it reads as the pair to Jade's own health row. That
+        // row already reports HP, so the panel does not repeat it (issues #42/#43).
+        addStat(tooltip, LABEL_SHP, Component.literal(Integer.toString((int) Math.ceil(existence.getSpiritualHealth()))));
+
         addRace(tooltip, entity, alignmentColour);
 
         if (alignment != null) {
             addStat(tooltip, LABEL_ALIGNMENT, alignment.getName());
         }
 
-        addStat(tooltip, LABEL_HP, Component.literal(Integer.toString(Mth.ceil(entity.getHealth()))));
-        addStat(tooltip, LABEL_SHP, Component.literal(Integer.toString((int) Math.ceil(existence.getSpiritualHealth()))));
         addStat(tooltip, LABEL_ARMOR, Component.literal(Integer.toString(entity.getArmorValue())));
         addStat(tooltip, LABEL_AURA, shortenedNumber(existence.getAura()));
         addStat(tooltip, LABEL_MAGICULE, shortenedNumber(existence.getMagicule()));

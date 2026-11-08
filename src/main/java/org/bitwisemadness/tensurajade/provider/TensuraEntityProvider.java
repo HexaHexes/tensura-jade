@@ -19,9 +19,19 @@ import snownee.jade.api.config.IPluginConfig;
  */
 public final class TensuraEntityProvider implements IComponentProvider<EntityAccessor> {
 
+    // Jade's EntityHealthAndArmorProvider renders at -4500 and BODY is 0, so this sits
+    // the panel directly under the health row whose leading SHP line pairs with it
+    // (issues #42/#43).
+    private static final int AFTER_ENTITY_HEALTH = -4400;
+
     @Override
     public ResourceLocation getUid() {
         return TensuraJadeConfig.ENTITY_ANALYSIS;
+    }
+
+    @Override
+    public int getDefaultPriority() {
+        return AFTER_ENTITY_HEALTH;
     }
 
     @Override

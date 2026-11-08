@@ -77,7 +77,6 @@ public final class AnalysisGameTests {
 
     // --- Entity panel labels (Tensura's own keys).
     private static final String LABEL_ALIGNMENT = "tensura_jade.alignment";
-    private static final String LABEL_HP = "tensura.vanilla_attribute.health.shortened_name";
     private static final String LABEL_SHP = "tensura.attribute.spiritual_health.shortened_name";
     private static final String LABEL_ARMOR = "attribute.name.generic.armor";
     private static final String LABEL_AURA = "tensura.attribute.aura.shortened_name";
@@ -197,9 +196,10 @@ public final class AnalysisGameTests {
     // ---------------------------------------------------------------------
 
     /**
-     * The entity panel is a fixed sequence of {@code "<label>: <value>"} lines - race
-     * first (absent here), then alignment, HP, spiritual health, armor, aura, magicule
-     * and maximum EP - each labelled with Tensura's own key.
+     * The entity panel is a fixed sequence of {@code "<label>: <value>"} lines -
+     * spiritual health first, so it pairs with Jade's own health row, then race (absent
+     * here), alignment, armor, aura, magicule and maximum EP - each labelled with
+     * Tensura's own key. HP is Jade's row, so the panel does not repeat it.
      *
      * <p>The mob is deliberately a vanilla one: the panel is supposed to work on
      * anything you aim Jade at, and Tensura registers its energy attributes for every
@@ -224,32 +224,26 @@ public final class AnalysisGameTests {
         existence.setMagicule(4321.0D);
         existence.setAlignment(Alignment.MAJIN);
 
-        // A freshly spawned mob's health is Tensura's business, not this panel's, so the input is
-        // pinned rather than assumed. A fraction proves the line reports *current* health - not the
-        // maximum - and that it rounds up as Tensura's does rather than truncating.
-        target.setHealth(4.5F);
-
         IPluginConfig toggles = config(values(
                 TensuraJadeConfig.RESPECT_ANALYSIS_GATING, false,
                 TensuraJadeConfig.SHOW_ABILITIES, false));
         TooltipRecorder panel = TooltipRecorder.create();
         TensuraAnalysis.appendEntity(panel.proxy(), entityAccessor(viewer, target), toggles, target);
 
-        check(panel.size() == 7,
-                "expected alignment/HP/SHP/armor/aura/magicule/EP for a raceless mob with abilities hidden, "
+        check(panel.size() == 6,
+                "expected SHP/alignment/armor/aura/magicule/EP for a raceless mob with abilities hidden, "
                         + "got " + panel.texts());
-        expectStat(panel, 0, LABEL_ALIGNMENT, Alignment.MAJIN.getName().getString());
-        expectStat(panel, 1, LABEL_HP, "5");
-        expectStat(panel, 2, LABEL_SHP, "55");
-        expectStat(panel, 3, LABEL_ARMOR, "0");
-        expectStat(panel, 4, LABEL_AURA, "1234");
-        expectStat(panel, 5, LABEL_MAGICULE, "4321");
+        expectStat(panel, 0, LABEL_SHP, "55");
+        expectStat(panel, 1, LABEL_ALIGNMENT, Alignment.MAJIN.getName().getString());
+        expectStat(panel, 2, LABEL_ARMOR, "0");
+        expectStat(panel, 3, LABEL_AURA, "1234");
+        expectStat(panel, 4, LABEL_MAGICULE, "4321");
         // Maximum EP is max magicule + max aura, both pinned above.
-        expectStat(panel, 6, LABEL_EP, "14000");
+        expectStat(panel, 5, LABEL_EP, "14000");
 
         // Ordering is part of the parity, not incidental.
-        check(labelKeys(panel).subList(0, 7).equals(List.of(
-                        LABEL_ALIGNMENT, LABEL_HP, LABEL_SHP, LABEL_ARMOR,
+        check(labelKeys(panel).subList(0, 6).equals(List.of(
+                        LABEL_SHP, LABEL_ALIGNMENT, LABEL_ARMOR,
                         LABEL_AURA, LABEL_MAGICULE, LABEL_EP)),
                 "panel label order was " + labelKeys(panel));
 
@@ -257,9 +251,10 @@ public final class AnalysisGameTests {
     }
 
     /**
-     * The race line leads the panel, carries the race's own name with no label prefix,
-     * and is tinted with the target's alignment colour - because that colouring is how
-     * Tensura communicates alignment, so it is part of the parity rather than decoration.
+     * The race line carries the race's own name with no label prefix and is tinted with
+     * the target's alignment colour - because that colouring is how Tensura communicates
+     * alignment, so it is part of the parity rather than decoration. It sits after SHP,
+     * which pairs with Jade's own health row, and leads the remaining stat lines.
      */
     @GameTest(template = "test_area")
     public static void race_line(GameTestHelper helper) {
@@ -277,9 +272,9 @@ public final class AnalysisGameTests {
         existence.setAlignment(Alignment.MAJIN);
         // Pin what the race hands the mob, so the assertions below describe this panel
         // rather than Tensura's balance values for a goblin.
+        existence.setSpiritualHealth(3.0D);
         existence.setAura(7.0D);
         existence.setMagicule(8.0D);
-        target.setHealth(1.1F);
 
         IPluginConfig toggles = config(values(
                 TensuraJadeConfig.RESPECT_ANALYSIS_GATING, false,
@@ -287,17 +282,17 @@ public final class AnalysisGameTests {
         TooltipRecorder panel = TooltipRecorder.create();
         TensuraAnalysis.appendEntity(panel.proxy(), entityAccessor(viewer, target), toggles, target);
 
-        check(panel.size() == 8,
-                "expected race + alignment + six stats, got " + panel.texts());
+        check(panel.size() == 7,
+                "expected SHP + race + alignment + armor/aura/magicule/EP, got " + panel.texts());
 
         Component expectedName = java.util.Objects.requireNonNull(
                 races.getRace().get().getRace().getName(), "race name must resolve for comparison");
-        Component raceLine = panel.line(0);
+        Component raceLine = panel.line(1);
         check(raceLine.getString().equals(expectedName.getString()),
-                "line 0 was <" + raceLine.getString() + "> but the race name is <"
+                "line 1 was <" + raceLine.getString() + "> but the race name is <"
                         + expectedName.getString() + ">");
-        check(!panel.text(0).contains(": "),
-                "the race line is a name, not a '<label>: <value>' stat: " + panel.text(0));
+        check(!panel.text(1).contains(": "),
+                "the race line is a name, not a '<label>: <value>' stat: " + panel.text(1));
 
         int tint = raceLine.getStyle().getColor() == null
                 ? -1
@@ -306,17 +301,17 @@ public final class AnalysisGameTests {
                 "the race line must be tinted with the alignment colour, got #"
                         + Integer.toHexString(tint));
 
-        // And everything after it falls into the documented stat order.
-        expectLabel(panel, 1, LABEL_ALIGNMENT);
-        expectStat(panel, 1, LABEL_ALIGNMENT, Alignment.MAJIN.getName().getString());
-        expectStat(panel, 2, LABEL_HP, "2");
-        expectStat(panel, 5, LABEL_AURA, "7");
-        expectStat(panel, 6, LABEL_MAGICULE, "8");
-        expectLabel(panel, 7, LABEL_EP);
+        // SHP leads, paired with Jade's health row; the race line then leads the stats.
+        expectStat(panel, 0, LABEL_SHP, "3");
+        expectStat(panel, 2, LABEL_ALIGNMENT, Alignment.MAJIN.getName().getString());
+        expectStat(panel, 4, LABEL_AURA, "7");
+        expectStat(panel, 5, LABEL_MAGICULE, "8");
+        expectLabel(panel, 6, LABEL_EP);
 
-        check(labelKeys(panel).subList(1, 8).equals(List.of(
-                        LABEL_ALIGNMENT, LABEL_HP, LABEL_SHP, LABEL_ARMOR,
-                        LABEL_AURA, LABEL_MAGICULE, LABEL_EP)),
+        check(labelKeys(panel).subList(0, 1).equals(List.of(LABEL_SHP)),
+                "SHP must lead the panel, got " + labelKeys(panel));
+        check(labelKeys(panel).subList(2, 7).equals(List.of(
+                        LABEL_ALIGNMENT, LABEL_ARMOR, LABEL_AURA, LABEL_MAGICULE, LABEL_EP)),
                 "the race line must lead into the stat lines in order, got " + labelKeys(panel));
 
         helper.succeed();

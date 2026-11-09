@@ -12,7 +12,7 @@ license="${mod_license}"
     displayName="${mod_name}"
     description='''Puts Tensura's analysis window inside Jade's tooltip.
 
-While both mods are loaded, the race, alignment, HP, SHP, armor, aura, magicule, EP and
+While both mods are loaded, the race, alignment, SHP, aura, magicule, EP and
 abilities Tensura would show on a mob - and the hardness, resistance, light, harvest
 check, crop age and EP it would show on a block - are appended to Jade's tooltip instead
 of floating in Tensura's own overlay, so the information appears once, where the rest of

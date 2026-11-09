@@ -1,0 +1,31 @@
+{
+    "providers": [
+        {
+            "type": "bitmap",
+            "file": "tensura_jade:font/shp_heart_full",
+            "chars": [
+                "\uE000"
+            ],
+            "height": 9,
+            "ascent": 8
+        },
+        {
+            "type": "bitmap",
+            "file": "tensura_jade:font/shp_heart_half",
+            "chars": [
+                "\uE001"
+            ],
+            "height": 9,
+            "ascent": 8
+        },
+        {
+            "type": "bitmap",
+            "file": "tensura_jade:font/shp_heart_empty",
+            "chars": [
+                "\uE002"
+            ],
+            "height": 9,
+            "ascent": 8
+        }
+    ]
+}

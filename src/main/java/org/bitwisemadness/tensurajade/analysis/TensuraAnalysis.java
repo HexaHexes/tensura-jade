@@ -11,6 +11,7 @@ import io.github.manasmods.manascore.skill.impl.SkillStorage;
 import io.github.manasmods.tensura.block.HipokuteGrass;
 import io.github.manasmods.tensura.block.entity.CharybdisCoreBlockEntity;
 import io.github.manasmods.tensura.entity.template.subclass.ILivingPartEntity;
+import io.github.manasmods.tensura.registry.attribute.TensuraAttributes;
 import io.github.manasmods.tensura.storage.Alignment;
 import io.github.manasmods.tensura.storage.TensuraStorages;
 import io.github.manasmods.tensura.storage.ability.AbilitySlot;
@@ -22,8 +23,10 @@ import java.util.Optional;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.TextColor;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -34,6 +37,7 @@ import org.bitwisemadness.tensurajade.config.TensuraJadeConfig;
 import snownee.jade.api.BlockAccessor;
 import snownee.jade.api.EntityAccessor;
 import snownee.jade.api.ITooltip;
+import snownee.jade.api.JadeIds;
 import snownee.jade.api.config.IPluginConfig;
 
 /**
@@ -62,7 +66,6 @@ public final class TensuraAnalysis {
 
     // --- Entity line labels: Tensura's own keys, so they read and localise identically.
     private static final String LABEL_SHP = "tensura.attribute.spiritual_health.shortened_name";
-    private static final String LABEL_ARMOR = "attribute.name.generic.armor";
     private static final String LABEL_AURA = "tensura.attribute.aura.shortened_name";
     private static final String LABEL_MAGICULE = "tensura.attribute.magicule.shortened_name";
     private static final String LABEL_EP = "tensura.attribute.existence_points.shortened_name";
@@ -79,6 +82,26 @@ public final class TensuraAnalysis {
 
     /** Tensura's {@code 16733525}: the orange it prints "Failed Growth" in. */
     private static final int FAILED_GROWTH_COLOUR = 0xFF5555;
+
+    /** The silver the SHP readout colour-shifts to (owner: pack-proof). */
+    private static final int SHP_SILVER = 0xC0C0C0;
+
+    /**
+     * The heart font: vanilla's own heart shapes, flattened to white
+     * silhouettes under {@code assets/tensura_jade/textures/font/} - the
+     * silver arrives as the code-side tint, so no resource pack that
+     * reskins vanilla's hearts can change this row.
+     */
+    private static final ResourceLocation SHP_HEART_FONT =
+            ResourceLocation.fromNamespaceAndPath("tensura_jade", "shp_hearts");
+
+    /** The font's three glyphs: full, half and empty heart. */
+    private static final String HEART_FULL = "\uE000";
+    private static final String HEART_HALF = "\uE001";
+    private static final String HEART_EMPTY = "\uE002";
+
+    /** Vanilla's heart scale: two points make one heart. */
+    private static final double POINTS_PER_HEART = 2.0;
 
     /** Age at which {@code HipokuteGrass} counts as failed - the top of its {@code AGE_3}. */
     private static final int HIPROKUTE_FAILED_AGE = 2;
@@ -128,7 +151,8 @@ public final class TensuraAnalysis {
 
         // SHP leads the panel so it reads as the pair to Jade's own health row. That
         // row already reports HP, so the panel does not repeat it (issues #42/#43).
-        addStat(tooltip, LABEL_SHP, Component.literal(Integer.toString((int) Math.ceil(existence.getSpiritualHealth()))));
+        addStat(tooltip, LABEL_SHP,
+                shpValue(existence.getSpiritualHealth(), maxSpiritualHealth(entity), config));
 
         addRace(tooltip, entity, alignmentColour);
 
@@ -136,7 +160,6 @@ public final class TensuraAnalysis {
             addStat(tooltip, LABEL_ALIGNMENT, alignment.getName());
         }
 
-        addStat(tooltip, LABEL_ARMOR, Component.literal(Integer.toString(entity.getArmorValue())));
         addStat(tooltip, LABEL_AURA, shortenedNumber(existence.getAura()));
         addStat(tooltip, LABEL_MAGICULE, shortenedNumber(existence.getMagicule()));
         addStat(tooltip, LABEL_EP, epValue(viewer, entity, config));
@@ -376,6 +399,60 @@ public final class TensuraAnalysis {
 
     private static void addStat(ITooltip tooltip, String labelKey, Component value) {
         tooltip.add(Component.translatable(labelKey).append(Component.literal(": ")).append(value));
+    }
+
+    /**
+     * The SHP readout in Jade's HP format (owner's brief): hearts while
+     * the maximum sits inside Jade's own render threshold - the same
+     * option that decides whether its health row draws hearts or a
+     * fraction - and Jade's ceiled {@code current/max} above it. Either
+     * form is colour-shifted to silver.
+     */
+    private static Component shpValue(double current, double max, IPluginConfig config) {
+        if (max <= 0) {
+            // no registered ceiling: the points known, never a faked maximum
+            return silver(Component.literal(hearts(current, 0, true)));
+        }
+        if (max > config.getInt(JadeIds.MC_ENTITY_HEALTH_MAX_FOR_RENDER)) {
+            return silver(Component.literal(
+                    ((int) Math.ceil(current)) + "/" + ((int) Math.ceil(max))));
+        }
+        return silver(Component.literal(hearts(current, max, false))
+                .withStyle(style -> style.withFont(SHP_HEART_FONT)));
+    }
+
+    /**
+     * The heart string: full, half and empty slots up to the maximum in
+     * vanilla's own arithmetic (two points a heart). Without a ceiling
+     * only the filled slots appear - an unknown maximum draws no empties.
+     */
+    private static String hearts(double current, double max, boolean currentOnly) {
+        int icons = currentOnly ? (int) Math.ceil(current / POINTS_PER_HEART)
+                : (int) Math.ceil(max / POINTS_PER_HEART);
+        int full = (int) Math.floor(current / POINTS_PER_HEART);
+        boolean half = current / POINTS_PER_HEART - full >= 0.5;
+        StringBuilder hearts = new StringBuilder(icons);
+        for (int i = 0; i < icons; i++) {
+            if (i < full) {
+                hearts.append(HEART_FULL);
+            } else if (i == full && half) {
+                hearts.append(HEART_HALF);
+            } else {
+                hearts.append(HEART_EMPTY);
+            }
+        }
+        return hearts.toString();
+    }
+
+    /** The colour-shift: the row's text (and white heart glyphs) read silver. */
+    private static MutableComponent silver(MutableComponent text) {
+        return text.withStyle(style -> style.withColor(TextColor.fromRgb(SHP_SILVER)));
+    }
+
+    /** The target's SHP ceiling from Tensura's attribute, or 0 when unregistered. */
+    private static double maxSpiritualHealth(LivingEntity entity) {
+        AttributeInstance instance = entity.getAttribute(TensuraAttributes.MAX_SPIRITUAL_HEALTH);
+        return instance == null ? 0 : instance.getValue();
     }
 
     /**

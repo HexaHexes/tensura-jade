@@ -1,6 +1,7 @@
 package org.bitwisemadness.tensurajade.gametest;
 
 import static org.bitwisemadness.tensurajade.gametest.TestSupport.TooltipRecorder;
+import static org.bitwisemadness.tensurajade.gametest.TestSupport.attribute;
 import static org.bitwisemadness.tensurajade.gametest.TestSupport.blockAccessor;
 import static org.bitwisemadness.tensurajade.gametest.TestSupport.check;
 import static org.bitwisemadness.tensurajade.gametest.TestSupport.config;
@@ -78,7 +79,6 @@ public final class AnalysisGameTests {
     // --- Entity panel labels (Tensura's own keys).
     private static final String LABEL_ALIGNMENT = "tensura_jade.alignment";
     private static final String LABEL_SHP = "tensura.attribute.spiritual_health.shortened_name";
-    private static final String LABEL_ARMOR = "attribute.name.generic.armor";
     private static final String LABEL_AURA = "tensura.attribute.aura.shortened_name";
     private static final String LABEL_MAGICULE = "tensura.attribute.magicule.shortened_name";
     private static final String LABEL_EP = "tensura.attribute.existence_points.shortened_name";
@@ -198,8 +198,8 @@ public final class AnalysisGameTests {
     /**
      * The entity panel is a fixed sequence of {@code "<label>: <value>"} lines -
      * spiritual health first, so it pairs with Jade's own health row, then race (absent
-     * here), alignment, armor, aura, magicule and maximum EP - each labelled with
-     * Tensura's own key. HP is Jade's row, so the panel does not repeat it.
+     * here), alignment, aura, magicule and maximum EP - each labelled with
+     * Tensura's own key. HP and armor are Jade's own rows, so neither is repeated.
      *
      * <p>The mob is deliberately a vanilla one: the panel is supposed to work on
      * anything you aim Jade at, and Tensura registers its energy attributes for every
@@ -230,20 +230,24 @@ public final class AnalysisGameTests {
         TooltipRecorder panel = TooltipRecorder.create();
         TensuraAnalysis.appendEntity(panel.proxy(), entityAccessor(viewer, target), toggles, target);
 
-        check(panel.size() == 6,
-                "expected SHP/alignment/armor/aura/magicule/EP for a raceless mob with abilities hidden, "
+        check(panel.size() == 5,
+                "expected SHP/alignment/aura/magicule/EP for a raceless mob with abilities hidden, "
                         + "got " + panel.texts());
-        expectStat(panel, 0, LABEL_SHP, "55");
+        // Above Jade's render threshold: its ceiled text form, quoted against the
+        // LIVE max - attribute modifiers are ARR's business, not this row's
+        double maxShp = attribute(target, TensuraAttributes.MAX_SPIRITUAL_HEALTH);
+        check(maxShp > 40, "the cap must sit above Jade's render threshold: " + maxShp);
+        expectStat(panel, 0, LABEL_SHP, "55/" + (int) Math.ceil(maxShp));
         expectStat(panel, 1, LABEL_ALIGNMENT, Alignment.MAJIN.getName().getString());
-        expectStat(panel, 2, LABEL_ARMOR, "0");
-        expectStat(panel, 3, LABEL_AURA, "1234");
-        expectStat(panel, 4, LABEL_MAGICULE, "4321");
+        expectStat(panel, 2, LABEL_AURA, "1234");
+        expectStat(panel, 3, LABEL_MAGICULE, "4321");
         // Maximum EP is max magicule + max aura, both pinned above.
-        expectStat(panel, 5, LABEL_EP, "14000");
+        expectStat(panel, 4, LABEL_EP, "14000");
 
-        // Ordering is part of the parity, not incidental.
-        check(labelKeys(panel).subList(0, 6).equals(List.of(
-                        LABEL_SHP, LABEL_ALIGNMENT, LABEL_ARMOR,
+        // Ordering is part of the parity, not incidental. Armor is absent:
+        // Jade's own health-and-armor provider already reports it.
+        check(labelKeys(panel).subList(0, 5).equals(List.of(
+                        LABEL_SHP, LABEL_ALIGNMENT,
                         LABEL_AURA, LABEL_MAGICULE, LABEL_EP)),
                 "panel label order was " + labelKeys(panel));
 
@@ -271,7 +275,9 @@ public final class AnalysisGameTests {
         check(existence != null, "a spawned mob must carry Tensura existence storage");
         existence.setAlignment(Alignment.MAJIN);
         // Pin what the race hands the mob, so the assertions below describe this panel
-        // rather than Tensura's balance values for a goblin.
+        // rather than Tensura's balance values for a goblin. The SHP cap sits inside
+        // Jade's render threshold, so this row draws the hearts form.
+        setAttribute(target, TensuraAttributes.MAX_SPIRITUAL_HEALTH, 40.0D);
         existence.setSpiritualHealth(3.0D);
         existence.setAura(7.0D);
         existence.setMagicule(8.0D);
@@ -282,8 +288,8 @@ public final class AnalysisGameTests {
         TooltipRecorder panel = TooltipRecorder.create();
         TensuraAnalysis.appendEntity(panel.proxy(), entityAccessor(viewer, target), toggles, target);
 
-        check(panel.size() == 7,
-                "expected SHP + race + alignment + armor/aura/magicule/EP, got " + panel.texts());
+        check(panel.size() == 6,
+                "expected SHP + race + alignment + aura/magicule/EP, got " + panel.texts());
 
         Component expectedName = java.util.Objects.requireNonNull(
                 races.getRace().get().getRace().getName(), "race name must resolve for comparison");
@@ -302,16 +308,42 @@ public final class AnalysisGameTests {
                         + Integer.toHexString(tint));
 
         // SHP leads, paired with Jade's health row; the race line then leads the stats.
-        expectStat(panel, 0, LABEL_SHP, "3");
+        // Inside the threshold the row is hearts: 3 points fill one full and one half,
+        // then empties out to the LIVE max (modifiers are ARR's business).
+        double maxShp = attribute(target, TensuraAttributes.MAX_SPIRITUAL_HEALTH);
+        check(maxShp <= 40, "the cap must sit inside Jade's render threshold: " + maxShp);
+        int icons = (int) Math.ceil(maxShp / 2.0);
+        check(icons >= 2, "three points must fill a full and a half heart: max " + maxShp);
+        expectStat(panel, 0, LABEL_SHP, "\uE000\uE001" + "\uE002".repeat(icons - 2));
         expectStat(panel, 2, LABEL_ALIGNMENT, Alignment.MAJIN.getName().getString());
-        expectStat(panel, 4, LABEL_AURA, "7");
-        expectStat(panel, 5, LABEL_MAGICULE, "8");
-        expectLabel(panel, 6, LABEL_EP);
+        expectStat(panel, 3, LABEL_AURA, "7");
+        expectStat(panel, 4, LABEL_MAGICULE, "8");
+        expectLabel(panel, 5, LABEL_EP);
+
+        // The hearts are colour-shifted to silver through the heart font, so a
+        // resource pack reskinning vanilla hearts cannot change this row.
+        Component shpLine = panel.line(0);
+        check(shpLine instanceof net.minecraft.network.chat.MutableComponent,
+                "the SHP line must be a composed component");
+        java.util.List<Component> parts =
+                ((net.minecraft.network.chat.MutableComponent) shpLine).getSiblings();
+        check(!parts.isEmpty(), "the SHP line must carry its value part");
+        Component value = parts.get(parts.size() - 1);
+        int silver = value.getStyle().getColor() == null
+                ? -1
+                : value.getStyle().getColor().getValue();
+        check(silver == 0xC0C0C0,
+                "the hearts must be colour-shifted to silver, got #"
+                        + Integer.toHexString(silver));
+        check(value.getStyle().getFont() != null
+                        && "tensura_jade:shp_hearts".equals(value.getStyle().getFont().toString()),
+                "the hearts must draw from the vanilla-heart font, got "
+                        + value.getStyle().getFont());
 
         check(labelKeys(panel).subList(0, 1).equals(List.of(LABEL_SHP)),
                 "SHP must lead the panel, got " + labelKeys(panel));
-        check(labelKeys(panel).subList(2, 7).equals(List.of(
-                        LABEL_ALIGNMENT, LABEL_ARMOR, LABEL_AURA, LABEL_MAGICULE, LABEL_EP)),
+        check(labelKeys(panel).subList(2, 6).equals(List.of(
+                        LABEL_ALIGNMENT, LABEL_AURA, LABEL_MAGICULE, LABEL_EP)),
                 "the race line must lead into the stat lines in order, got " + labelKeys(panel));
 
         helper.succeed();

@@ -2,7 +2,7 @@
     "providers": [
         {
             "type": "bitmap",
-            "file": "tensura_jade:font/shp_heart_full",
+            "file": "tensura_jade:font/shp_heart_full.png",
             "chars": [
                 "\uE000"
             ],
@@ -11,7 +11,7 @@
         },
         {
             "type": "bitmap",
-            "file": "tensura_jade:font/shp_heart_half",
+            "file": "tensura_jade:font/shp_heart_half.png",
             "chars": [
                 "\uE001"
             ],
@@ -20,7 +20,7 @@
         },
         {
             "type": "bitmap",
-            "file": "tensura_jade:font/shp_heart_empty",
+            "file": "tensura_jade:font/shp_heart_empty.png",
             "chars": [
                 "\uE002"
             ],

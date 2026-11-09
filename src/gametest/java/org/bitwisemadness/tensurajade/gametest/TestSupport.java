@@ -26,6 +26,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import snownee.jade.api.BlockAccessor;
 import snownee.jade.api.EntityAccessor;
 import snownee.jade.api.ITooltip;
+import snownee.jade.api.JadeIds;
 import snownee.jade.api.config.IPluginConfig;
 
 /**
@@ -208,6 +209,17 @@ public final class TestSupport {
                             yield value;
                         }
                         throw new UnsupportedOperationException("unexpected IPluginConfig.get arguments");
+                    }
+                    case "getInt" -> {
+                        // The one int the panel reads: Jade's own default for the
+                        // hearts-vs-text threshold (VanillaPlugin registers 40)
+                        if (args != null && args.length == 1
+                                && args[0] instanceof ResourceLocation key
+                                && key.equals(JadeIds.MC_ENTITY_HEALTH_MAX_FOR_RENDER)) {
+                            yield 40;
+                        }
+                        throw new UnsupportedOperationException(
+                                "unexpected IPluginConfig.getInt " + (args == null ? "" : args[0]));
                     }
                     case "toString" -> "TestPluginConfig" + values;
                     case "hashCode" -> System.identityHashCode(proxy);

@@ -246,7 +246,7 @@ public final class AnalysisGameTests {
         // attribute modifiers are ARR's business, not this row's
         double maxShp = attribute(target, TensuraAttributes.MAX_SPIRITUAL_HEALTH);
         check(maxShp > 40, "the cap must sit above Jade's render threshold: " + maxShp);
-        expectUnlabelled(panel, 0, "\uE00055/" + (int) Math.ceil(maxShp));
+        expectUnlabelled(panel, 0, "\uE000\uE00355/" + (int) Math.ceil(maxShp));
         // Only the heart may wear the heart font: as the heart literal's child
         // the value used to inherit shp_hearts, which has no digit glyphs -
         // the in-game "full heart then squares" row (owner's report).

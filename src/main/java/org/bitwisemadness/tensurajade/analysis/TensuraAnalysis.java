@@ -18,10 +18,15 @@ import io.github.manasmods.tensura.storage.ability.AbilitySlot;
 import io.github.manasmods.tensura.storage.ability.IAbility;
 import io.github.manasmods.tensura.storage.ep.IExistence;
 import io.github.manasmods.tensura.util.EnergyHelper;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.TextColor;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
@@ -33,6 +38,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import org.bitwisemadness.mobinfocommon.analysis.AnalysisGating;
+import org.bitwisemadness.tensurajade.TensuraJade;
 import org.bitwisemadness.tensurajade.config.TensuraJadeConfig;
 import snownee.jade.api.BlockAccessor;
 import snownee.jade.api.EntityAccessor;
@@ -105,6 +111,9 @@ public final class TensuraAnalysis {
 
     /** Age at which {@code HipokuteGrass} counts as failed - the top of its {@code AGE_3}. */
     private static final int HIPROKUTE_FAILED_AGE = 2;
+
+    /** One-shot guard: the glyph diagnostic logs at most once per JVM. */
+    private static boolean glyphDiagnosticLogged;
 
     private TensuraAnalysis() {
     }
@@ -409,21 +418,28 @@ public final class TensuraAnalysis {
      * form is colour-shifted to silver.
      */
     private static Component shpValue(double current, double max, IPluginConfig config) {
+        String glyphs;
+        Component row;
         if (max <= 0) {
             // no registered ceiling: the points known, never a faked maximum
-            return silver(Component.literal(hearts(current, 0, true))
+            glyphs = hearts(current, 0, true);
+            row = silver(Component.literal(glyphs)
                     .withStyle(style -> style.withFont(SHP_HEART_FONT)));
-        }
-        if (max > config.getInt(JadeIds.MC_ENTITY_HEALTH_MAX_FOR_RENDER)) {
+        } else if (max > config.getInt(JadeIds.MC_ENTITY_HEALTH_MAX_FOR_RENDER)) {
             // Jade labels its text form with one full heart before the value
             // (its text mode draws a single heart glyph, then the number)
             String value = ((int) Math.ceil(current)) + "/" + ((int) Math.ceil(max));
-            return silver(Component.literal(HEART_FULL)
+            glyphs = HEART_FULL;
+            row = silver(Component.literal(HEART_FULL)
                     .withStyle(style -> style.withFont(SHP_HEART_FONT))
                     .append(Component.literal(" " + value)));
+        } else {
+            glyphs = hearts(current, max, false);
+            row = silver(Component.literal(glyphs)
+                    .withStyle(style -> style.withFont(SHP_HEART_FONT)));
         }
-        return silver(Component.literal(hearts(current, max, false))
-                .withStyle(style -> style.withFont(SHP_HEART_FONT)));
+        logGlyphDiagnostic(glyphs, row);
+        return row;
     }
 
     /**
@@ -452,6 +468,101 @@ public final class TensuraAnalysis {
     /** The colour-shift: the row's text (and white heart glyphs) read silver. */
     private static MutableComponent silver(MutableComponent text) {
         return text.withStyle(style -> style.withColor(TextColor.fromRgb(SHP_SILVER)));
+    }
+
+    /**
+     * One-shot ground truth for the tofu-box report: the built string's
+     * codepoints, the row's style font, whether that font id is a loaded
+     * FontSet, and what the renderer's own lookup returns per codepoint.
+     * Reflection only - this class must stay loadable on a dedicated
+     * server (the headless panel tests), so no client class may appear
+     * at compile time.
+     */
+    private static void logGlyphDiagnostic(String glyphs, Component row) {
+        if (glyphDiagnosticLogged) {
+            return;
+        }
+        glyphDiagnosticLogged = true;
+        try {
+            Class<?> environment = Class.forName("net.neoforged.fml.loading.FMLEnvironment");
+            Object dist = environment.getField("dist").get(null);
+            String distName = (String) dist.getClass().getMethod("name").invoke(dist);
+            if (!"CLIENT".equals(distName)) {
+                TensuraJade.LOGGER.info("SHP glyph diagnostic: skipped (dist={})", distName);
+                return;
+            }
+            Class<?> minecraftType = Class.forName("net.minecraft.client.Minecraft");
+            Object minecraft = minecraftType.getMethod("getInstance").invoke(null);
+            Field managerField = minecraftType.getDeclaredField("fontManager");
+            managerField.setAccessible(true);
+            Object fontManager = managerField.get(minecraft);
+            Field setsField = fontManager.getClass().getDeclaredField("fontSets");
+            setsField.setAccessible(true);
+            Map<?, ?> fontSets = (Map<?, ?>) setsField.get(fontManager);
+            StringBuilder report = new StringBuilder("SHP glyph diagnostic: dist=");
+            report.append(distName).append(" styleFont=").append(row.getStyle().getFont());
+            report.append(" codepoints=");
+            glyphs.codePoints()
+                    .forEach(cp -> report.append(String.format(Locale.ROOT, "U+%04X ", cp)));
+            boolean loaded = fontSets.containsKey(SHP_HEART_FONT);
+            report.append(" fontSetLoaded=").append(loaded);
+            if (loaded) {
+                appendFontSetProbes(report, fontManager, fontSets.get(SHP_HEART_FONT));
+            } else {
+                report.append(" knownFonts=").append(fontSets.keySet());
+            }
+            Object defaultSet = fontSets.get(Style.DEFAULT_FONT);
+            report.append(" defaultE000=")
+                    .append(defaultSet == null ? "absent" : glyphLookup(defaultSet, HEART_FULL));
+            TensuraJade.LOGGER.info("{}", report);
+        } catch (Throwable t) {
+            TensuraJade.LOGGER.info("SHP glyph diagnostic: failed ({})", t.toString());
+        }
+    }
+
+    /**
+     * The deep probes: whether our FontSet is the renderer's shared
+     * missing set, how many providers survived the reload, and the glyph
+     * each codepoint resolves to. Any reflection miss degrades to one
+     * "probeFailed=" note - the base report above is never lost.
+     */
+    private static void appendFontSetProbes(StringBuilder report, Object fontManager, Object fontSet) {
+        try {
+            Field missingField = fontManager.getClass().getDeclaredField("missingFontSet");
+            missingField.setAccessible(true);
+            Object missingSet = missingField.get(fontManager);
+            report.append(" isMissingSet=").append(fontSet == missingSet);
+            Method resolver = fontManager.getClass()
+                    .getDeclaredMethod("getFontSetCached", ResourceLocation.class);
+            resolver.setAccessible(true);
+            report.append(" rendererResolvesMissing=")
+                    .append(resolver.invoke(fontManager, SHP_HEART_FONT) == missingSet);
+            Field activeField = fontSet.getClass().getDeclaredField("activeProviders");
+            activeField.setAccessible(true);
+            Object active = activeField.get(fontSet);
+            report.append(" activeProviders=").append(active instanceof List<?> list
+                    ? list.size() : String.valueOf(active));
+            report.append(" full=").append(glyphLookup(fontSet, HEART_FULL));
+            report.append(" half=").append(glyphLookup(fontSet, HEART_HALF));
+            report.append(" empty=").append(glyphLookup(fontSet, HEART_EMPTY));
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            report.append(" probeFailed=").append(e.toString());
+        }
+    }
+
+    /** One glyph lookup as the renderer performs it, named for the log. */
+    private static String glyphLookup(Object fontSet, String glyph) {
+        try {
+            Method lookup = fontSet.getClass().getMethod("getGlyphInfo", int.class, boolean.class);
+            Object info = lookup.invoke(fontSet, glyph.codePointAt(0), false);
+            if (info == null) {
+                return "null";
+            }
+            String name = info.getClass().getSimpleName();
+            return name + (name.contains("Missing") ? " (BOX)" : "");
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return "error:" + e;
+        }
     }
 
     /** The target's SHP ceiling from Tensura's attribute, or 0 when unregistered. */

@@ -425,8 +425,9 @@ public final class TensuraAnalysis {
             row = silver(Component.literal(glyphs)
                     .withStyle(style -> style.withFont(SHP_HEART_FONT)));
         } else if (max > config.getInt(JadeIds.MC_ENTITY_HEALTH_MAX_FOR_RENDER)) {
-            // Jade labels its text form with one full heart before the value
-            // (its text mode draws a single heart glyph, then the number)
+            // Jade labels its text form with one full heart before the value,
+            // drawn tight against it (owner: no space) - its text mode shows
+            // a single heart glyph, then the number
             String value = ((int) Math.ceil(current)) + "/" + ((int) Math.ceil(max));
             glyphs = HEART_FULL;
             // the value is the heart literal's CHILD: with no font of its own
@@ -434,7 +435,7 @@ public final class TensuraAnalysis {
             // "full heart then squares" row (owner's report)
             row = silver(Component.literal(HEART_FULL)
                     .withStyle(style -> style.withFont(SHP_HEART_FONT))
-                    .append(Component.literal(" " + value)
+                    .append(Component.literal(value)
                             .withStyle(style -> style.withFont(Style.DEFAULT_FONT))));
         } else {
             glyphs = hearts(current, max, false);

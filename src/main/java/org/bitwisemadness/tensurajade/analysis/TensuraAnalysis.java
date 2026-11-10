@@ -430,9 +430,13 @@ public final class TensuraAnalysis {
             // (its text mode draws a single heart glyph, then the number)
             String value = ((int) Math.ceil(current)) + "/" + ((int) Math.ceil(max));
             glyphs = HEART_FULL;
+            // the value is the heart literal's CHILD: with no font of its own
+            // it inherits shp_hearts, which has no digit glyphs - the in-game
+            // "full heart then squares" row (owner's report)
             row = silver(Component.literal(HEART_FULL)
                     .withStyle(style -> style.withFont(SHP_HEART_FONT))
-                    .append(Component.literal(" " + value)));
+                    .append(Component.literal(" " + value)
+                            .withStyle(style -> style.withFont(Style.DEFAULT_FONT))));
         } else {
             glyphs = hearts(current, max, false);
             row = silver(Component.literal(glyphs)

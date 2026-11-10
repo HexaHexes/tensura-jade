@@ -28,7 +28,9 @@ import io.github.manasmods.tensura.storage.ability.AbilitySlot;
 import io.github.manasmods.tensura.storage.ability.IAbility;
 import io.github.manasmods.tensura.storage.ep.IExistence;
 import io.github.manasmods.tensura.storage.player.ITensuraPlayer;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
@@ -36,6 +38,7 @@ import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.TextColor;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
@@ -79,6 +82,10 @@ public final class AnalysisGameTests {
     // --- Entity panel labels (Tensura's own keys).
     private static final String LABEL_ALIGNMENT = "tensura_jade.alignment";
     private static final String LABEL_SHP = "tensura.attribute.spiritual_health.shortened_name";
+
+    /** The heart font the value must never inherit (owner's tofu report). */
+    private static final ResourceLocation SHP_FONT =
+            ResourceLocation.fromNamespaceAndPath("tensura_jade", "shp_hearts");
     private static final String LABEL_AURA = "tensura.attribute.aura.shortened_name";
     private static final String LABEL_MAGICULE = "tensura.attribute.magicule.shortened_name";
     private static final String LABEL_EP = "tensura.attribute.existence_points.shortened_name";
@@ -239,6 +246,25 @@ public final class AnalysisGameTests {
         double maxShp = attribute(target, TensuraAttributes.MAX_SPIRITUAL_HEALTH);
         check(maxShp > 40, "the cap must sit above Jade's render threshold: " + maxShp);
         expectStat(panel, 0, LABEL_SHP, "\uE000 55/" + (int) Math.ceil(maxShp));
+        // Only the heart may wear the heart font: as the heart literal's child
+        // the value used to inherit shp_hearts, which has no digit glyphs -
+        // the in-game "full heart then squares" row (owner's report).
+        List<String> heartRuns = new ArrayList<>();
+        List<ResourceLocation> valueFonts = new ArrayList<>();
+        panel.line(0).visit((style, text) -> {
+            if (style.getFont().equals(SHP_FONT)) {
+                heartRuns.add(text);
+            }
+            if (text.contains("/")) {
+                valueFonts.add(style.getFont());
+            }
+            return Optional.empty();
+        }, Style.EMPTY);
+        check(heartRuns.size() == 1 && !heartRuns.get(0).contains("/"),
+                "exactly the heart may wear shp_hearts, got " + heartRuns);
+        check(valueFonts.equals(List.of(Style.DEFAULT_FONT)),
+                "the value must read in the default font, not inherit: " + valueFonts);
+
         expectStat(panel, 1, LABEL_ALIGNMENT, Alignment.MAJIN.getName().getString());
         expectStat(panel, 2, LABEL_AURA, "1234");
         expectStat(panel, 3, LABEL_MAGICULE, "4321");

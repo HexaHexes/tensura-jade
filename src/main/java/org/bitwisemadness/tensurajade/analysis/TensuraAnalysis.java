@@ -71,7 +71,6 @@ import snownee.jade.api.config.IPluginConfig;
 public final class TensuraAnalysis {
 
     // --- Entity line labels: Tensura's own keys, so they read and localise identically.
-    private static final String LABEL_SHP = "tensura.attribute.spiritual_health.shortened_name";
     private static final String LABEL_AURA = "tensura.attribute.aura.shortened_name";
     private static final String LABEL_MAGICULE = "tensura.attribute.magicule.shortened_name";
     private static final String LABEL_EP = "tensura.attribute.existence_points.shortened_name";
@@ -158,10 +157,10 @@ public final class TensuraAnalysis {
         Alignment alignment = existence.getAlignment();
         int alignmentColour = alignment == null ? 0xFFFFFF : alignment.getColor() & 0xFFFFFF;
 
-        // SHP leads the panel so it reads as the pair to Jade's own health row. That
-        // row already reports HP, so the panel does not repeat it (issues #42/#43).
-        addStat(tooltip, LABEL_SHP,
-                shpValue(existence.getSpiritualHealth(), maxSpiritualHealth(entity), config));
+        // SHP leads the panel as the bare readout - no "SHP: " label (owner's
+        // brief) - so it pairs with Jade's own unlabelled hearts row. That row
+        // already reports HP, so the panel does not repeat it (issues #42/#43).
+        tooltip.add(shpValue(existence.getSpiritualHealth(), maxSpiritualHealth(entity), config));
 
         addRace(tooltip, entity, alignmentColour);
 

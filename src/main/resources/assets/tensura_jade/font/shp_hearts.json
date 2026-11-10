@@ -2,27 +2,9 @@
     "providers": [
         {
             "type": "bitmap",
-            "file": "tensura_jade:font/shp_heart_full.png",
+            "file": "tensura_jade:font/shp_hearts.png",
             "chars": [
-                "\uE000"
-            ],
-            "height": 9,
-            "ascent": 8
-        },
-        {
-            "type": "bitmap",
-            "file": "tensura_jade:font/shp_heart_half.png",
-            "chars": [
-                "\uE001"
-            ],
-            "height": 9,
-            "ascent": 8
-        },
-        {
-            "type": "bitmap",
-            "file": "tensura_jade:font/shp_heart_empty.png",
-            "chars": [
-                "\uE002"
+                "\uE000\uE001\uE002"
             ],
             "height": 9,
             "ascent": 8

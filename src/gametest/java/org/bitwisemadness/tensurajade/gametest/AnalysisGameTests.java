@@ -252,12 +252,14 @@ public final class AnalysisGameTests {
         // the in-game "full heart then squares" row (owner's report).
         List<String> heartRuns = new ArrayList<>();
         List<ResourceLocation> valueFonts = new ArrayList<>();
+        List<Integer> valueColours = new ArrayList<>();
         panel.line(0).visit((style, text) -> {
             if (style.getFont().equals(SHP_FONT)) {
                 heartRuns.add(text);
             }
             if (text.contains("/")) {
                 valueFonts.add(style.getFont());
+                valueColours.add(style.getColor() == null ? -1 : style.getColor().getValue());
             }
             return Optional.empty();
         }, Style.EMPTY);
@@ -265,6 +267,8 @@ public final class AnalysisGameTests {
                 "exactly the heart may wear shp_hearts, got " + heartRuns);
         check(valueFonts.equals(List.of(Style.DEFAULT_FONT)),
                 "the value must read in the default font, not inherit: " + valueFonts);
+        check(valueColours.equals(List.of(0xA0A0A0)),
+                "the value must read in Jade's grey (its normal colour), got " + valueColours);
 
         expectStat(panel, 1, LABEL_ALIGNMENT, Alignment.MAJIN.getName().getString());
         expectStat(panel, 2, LABEL_AURA, "1234");

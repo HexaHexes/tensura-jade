@@ -45,6 +45,7 @@ import snownee.jade.api.EntityAccessor;
 import snownee.jade.api.ITooltip;
 import snownee.jade.api.JadeIds;
 import snownee.jade.api.config.IPluginConfig;
+import snownee.jade.api.theme.IThemeHelper;
 
 /**
  * Reproduces the content of Tensura's analysis overlay as Jade tooltip lines.
@@ -90,6 +91,13 @@ public final class TensuraAnalysis {
 
     /** The silver the SHP readout colour-shifts to (owner: pack-proof). */
     private static final int SHP_SILVER = 0xC0C0C0;
+
+    /**
+     * The grey Jade prints HP numbers in when its theme cannot be asked:
+     * Jade's own {@code ColorPalette.DEFAULT.normal} and the active
+     * Excalibur theme's {@code text.colors.normal} both read {@code #a0a0a0}.
+     */
+    private static final int JADE_NORMAL_FALLBACK = 0xA0A0A0;
 
     /**
      * The heart font: vanilla's own heart shapes, flattened to white
@@ -436,7 +444,8 @@ public final class TensuraAnalysis {
             row = silver(Component.literal(HEART_FULL)
                     .withStyle(style -> style.withFont(SHP_HEART_FONT))
                     .append(Component.literal(value)
-                            .withStyle(style -> style.withFont(Style.DEFAULT_FONT))));
+                            .withStyle(style -> style.withFont(Style.DEFAULT_FONT)
+                                    .withColor(TextColor.fromRgb(jadeNumberColour())))));
         } else {
             glyphs = hearts(current, max, false);
             row = silver(Component.literal(glyphs)
@@ -472,6 +481,21 @@ public final class TensuraAnalysis {
     /** The colour-shift: the row's text (and white heart glyphs) read silver. */
     private static MutableComponent silver(MutableComponent text) {
         return text.withStyle(style -> style.withColor(TextColor.fromRgb(SHP_SILVER)));
+    }
+
+    /**
+     * The colour Jade draws its HP numbers with - the active theme's normal
+     * text colour, read live so a themed install pairs exactly (owner:
+     * "Jade uses a greyish color for the HP numbers and we should do the
+     * same"). Any failure - headless server, Jade absent - falls back to
+     * Jade's own default normal.
+     */
+    private static int jadeNumberColour() {
+        try {
+            return IThemeHelper.get().getNormalColor() & 0xFFFFFF;
+        } catch (Throwable t) {
+            return JADE_NORMAL_FALLBACK;
+        }
     }
 
     /**

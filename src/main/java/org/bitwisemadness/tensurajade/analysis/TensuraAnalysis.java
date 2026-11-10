@@ -113,6 +113,10 @@ public final class TensuraAnalysis {
     private static final String HEART_HALF = "\uE001";
     private static final String HEART_EMPTY = "\uE002";
 
+    /** A one-unit transparent spacer: the value starts where Jade starts
+     * its number - the heart origin + 10, HealthElement's own offset. */
+    private static final String SHP_GAP = "\uE003";
+
     /** Vanilla's heart scale: two points make one heart. */
     private static final double POINTS_PER_HEART = 2.0;
 
@@ -441,7 +445,7 @@ public final class TensuraAnalysis {
             // the value is the heart literal's CHILD: with no font of its own
             // it inherits shp_hearts, which has no digit glyphs - the in-game
             // "full heart then squares" row (owner's report)
-            row = silver(Component.literal(HEART_FULL)
+            row = silver(Component.literal(HEART_FULL + SHP_GAP)
                     .withStyle(style -> style.withFont(SHP_HEART_FONT))
                     .append(Component.literal(value)
                             .withStyle(style -> style.withFont(Style.DEFAULT_FONT)

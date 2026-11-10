@@ -193,6 +193,21 @@ public final class TestSupport {
                         + " (full panel: " + lines.texts() + ")");
     }
 
+    /**
+     * Asserts line {@code index} is exactly {@code expectedValue} with no label at
+     * all: neither a {@code "<label>: "} prefix nor a translatable root - the owner's
+     * brief for the SHP row, which now leads the panel as the bare readout.
+     */
+    public static void expectUnlabelled(TooltipRecorder lines, int index, String expectedValue) {
+        String actual = lines.text(index);
+        check(expectedValue.equals(actual),
+                "line " + index + " was <" + actual + "> but expected the bare <" + expectedValue + ">"
+                        + " (full panel: " + lines.texts() + ")");
+        check(labelKeyOf(lines.line(index)) == null,
+                "line " + index + " must carry no label (owner's brief), got <"
+                        + labelKeyOf(lines.line(index)) + ">");
+    }
+
     // ---------------------------------------------------------------------
     // IPluginConfig - a map lookup, nothing more
     // ---------------------------------------------------------------------

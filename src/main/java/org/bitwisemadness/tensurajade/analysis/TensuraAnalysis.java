@@ -411,11 +411,16 @@ public final class TensuraAnalysis {
     private static Component shpValue(double current, double max, IPluginConfig config) {
         if (max <= 0) {
             // no registered ceiling: the points known, never a faked maximum
-            return silver(Component.literal(hearts(current, 0, true)));
+            return silver(Component.literal(hearts(current, 0, true))
+                    .withStyle(style -> style.withFont(SHP_HEART_FONT)));
         }
         if (max > config.getInt(JadeIds.MC_ENTITY_HEALTH_MAX_FOR_RENDER)) {
-            return silver(Component.literal(
-                    ((int) Math.ceil(current)) + "/" + ((int) Math.ceil(max))));
+            // Jade labels its text form with one full heart before the value
+            // (its text mode draws a single heart glyph, then the number)
+            String value = ((int) Math.ceil(current)) + "/" + ((int) Math.ceil(max));
+            return silver(Component.literal(HEART_FULL)
+                    .withStyle(style -> style.withFont(SHP_HEART_FONT))
+                    .append(Component.literal(" " + value)));
         }
         return silver(Component.literal(hearts(current, max, false))
                 .withStyle(style -> style.withFont(SHP_HEART_FONT)));

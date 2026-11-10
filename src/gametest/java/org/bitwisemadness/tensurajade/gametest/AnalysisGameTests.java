@@ -233,11 +233,12 @@ public final class AnalysisGameTests {
         check(panel.size() == 5,
                 "expected SHP/alignment/aura/magicule/EP for a raceless mob with abilities hidden, "
                         + "got " + panel.texts());
-        // Above Jade's render threshold: its ceiled text form, quoted against the
-        // LIVE max - attribute modifiers are ARR's business, not this row's
+        // Above Jade's render threshold: its ceiled text form behind the one
+        // full heart Jade labels it with, quoted against the LIVE max -
+        // attribute modifiers are ARR's business, not this row's
         double maxShp = attribute(target, TensuraAttributes.MAX_SPIRITUAL_HEALTH);
         check(maxShp > 40, "the cap must sit above Jade's render threshold: " + maxShp);
-        expectStat(panel, 0, LABEL_SHP, "55/" + (int) Math.ceil(maxShp));
+        expectStat(panel, 0, LABEL_SHP, "\uE000 55/" + (int) Math.ceil(maxShp));
         expectStat(panel, 1, LABEL_ALIGNMENT, Alignment.MAJIN.getName().getString());
         expectStat(panel, 2, LABEL_AURA, "1234");
         expectStat(panel, 3, LABEL_MAGICULE, "4321");

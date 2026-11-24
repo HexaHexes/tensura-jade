@@ -6,8 +6,8 @@ and pulled in verbatim - **never hand-edit it.** Everything in this file is this
 repo's own and is edited freely; keep it aligned with the org rules rather than
 restating them.
 
-**Repo:** `HexaHexes/tensura-jade` · **Mod ID:** `tensura_jade` · **Branch:** `main`
-**Platform:** Minecraft 1.21.1 / NeoForge 21.1.233 / JDK 21 · **Jar:** `build/libs/tensura_jade-<version>.jar`
+**Repo:** `HexaHexes/tensura-jade` · **Mod ID:** `tensura_jade` · **Branch:** `neoforge-1.21.1` (the loader line; this is the default branch - no `main`)
+**Platform:** Minecraft 1.21.1 / NeoForge 21.1.259 / JDK 21 · **Jar:** `build/libs/tensura_jade-neoforge-1.21.1-<version>.jar`
 
 A NeoForge addon that moves Tensura's analysis window into Jade's look-up tooltip.
 Aim at a mob or block and its Tensura stats appear in the Jade tooltip you already
